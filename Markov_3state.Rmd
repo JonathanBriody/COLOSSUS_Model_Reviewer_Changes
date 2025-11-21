@@ -705,7 +705,7 @@ summary(survfit(Surv(time, status) ~ 1, data = df_TTD), times = 1500)
 
 # So, we make 2 new excel files of data and store them in the same folder from the Angiopredict data Ian gave us and which we used to make our TTP and TTD data.
 
-library(foreign, lib.loc = "C:/Program Files/R/R-4.2.2/library")
+library(foreign, lib.loc = "C:/Program Files/R/R-4.5.2/library")
 library(readxl)
 OS_WITHBEV <- read_excel("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/OS_WITHBEV.xlsx")
 
@@ -6583,40 +6583,40 @@ This paper says in technical terms which distributions fit and why:
 
 Model Parameter Estimation and Uncertainty Analysis: A Report of the ISPOR-SMDM Modeling Good Research Practices Task Force Working Group--6 <file:///C:/Users/Jonathan/OneDrive%20-%20Royal%20College%20of%20Surgeons%20in%20Ireland/COLOSSUS/Briggs%20et%20al%202012%20model%20parameter%20estimation%20and%20uncertainty.pdf>
 
-| Parameter                                            | Base Case Value       | Minimum Value                 | Maximum Value                 | Source        | Distribution                                                                        |
+| Parameter | Base Case Value | Minimum Value | Maximum Value | Source | Distribution |
 |------------|------------|------------|------------|------------|------------|
-| **Cost (Per Cycle)**                                 |                       |                               |                               |               |                                                                                     |
-| FOLFOX                                               | `c_PFS_Folfox`        | `Minimum_c_PFS_Folfox`        | `Maximum_c_PFS_Folfox`        |               | GAMMA(`a.cIntervention_c_PFS_Folfox`, `b.cIntervention_c_PFS_Folfox`)               |
-| FOLFIRI                                              | `c_OS_Folfiri`        | `Minimum_c_OS_Folfiri`        | `Maximum_c_OS_Folfiri`        |               | GAMMA(`a.cIntervention_c_OS_Folfiri`, `b.cIntervention_c_OS_Folfiri`)               |
-| Bevacizumab                                          | `c_PFS_Bevacizumab`   | `Minimum_c_PFS_Bevacizumab`   | `Maximum_c_PFS_Bevacizumab`   |               | GAMMA( `a.cIntervention_c_PFS_Bevacizumab`, `b.cIntervention_c_PFS_Bevacizumab` )   |
-| Administration Cost                                  | `administration_cost` | `Minimum_administration_cost` | `Maximum_administration_cost` |               | GAMMA(`a.cIntervention_administration_cost`, `b.cIntervention_administration_cost`) |
-| **Adverse Event Cost**                               |                       |                               |                               |               |                                                                                     |
-| Leukopenia                                           | `c_AE1`               | `Minimum_c_AE1`               | `Maximum_c_AE1`               |               | `GAMMA(a.cIntervention_c_AE1, b.cIntervention_c_AE1)`                               |
-| Diarrhea                                             | `c_AE2`               | `Minimum_c_AE2`               | `Maximum_c_AE2`               |               | `GAMMA(a.cIntervention_c_AE2, b.cIntervention_c_AE2)`                               |
-| Vomiting                                             | `c_AE3`               | `Minimum_c_AE3`               | `Maximum_c_AE3`               |               | `GAMMA(a.cIntervention_c_AE3, b.cIntervention_c_AE3)`                               |
-|                                                      |                       |                               |                               |               |                                                                                     |
-| **Adverse Event Incidence - With Bevacizumab**       |                       |                               |                               |               |                                                                                     |
-| Leukopenia                                           | `p_FA1_Exp`           | `Minimum_p_FA1_EXPR`          | `Maximum_p_FA1_EXPR`          |               | BETA(`alpha_p_FA1_EXPR`, `beta_p_FA1_EXPR`)                                         |
-| Diarrhea                                             | `p_FA2_Exp`           | `Minimum_p_FA2_EXPR`          | `Maximum_p_FA2_EXPR`          |               | BETA(`alpha_p_FA2_EXPR`, `beta_p_FA2_EXPR`)                                         |
-| Vomiting                                             | `p_FA3_Exp`           | `Minimum_p_FA3_EXPR`          | `Maximum_p_FA3_EXPR`          |               | BETA(`alpha_p_FA3_EXPR`, `beta_p_FA3_EXPR`)                                         |
-| **Adverse Event Incidence - Without Bevacizumab**    |                       |                               |                               |               |                                                                                     |
-| Leukopenia                                           | `p_FA1_STD`           | `Minimum_p_FA1_STD`           | `Maximum_p_FA1_STD`           |               | BETA(`alpha_p_FA1_STD` , `beta_p_FA1_STD`)                                          |
-| Diarrhea                                             | `p_FA2_STD`           | `Minimum_p_FA2_STD`           | `Maximum_p_FA2_STD`           |               | BETA(`alpha_p_FA2_STD` , `beta_p_FA2_STD`)                                          |
-| Vomiting                                             | `p_FA3_STD`           | `Minimum_p_FA3_STD`           | `Maximum_p_FA3_STD`           |               | BETA(`alpha_p_FA3_STD` , `beta_p_FA3_STD`)                                          |
-| **Utility (Per Cycle)**                              |                       |                               |                               |               |                                                                                     |
-| Progression Free Survival                            | `u_F`                 | `Minimum_u_F`                 | `Maximum_u_F`                 |               | BETA(`u_F_alpha`, `u_F_beta`)                                                       |
-| Overall Survival                                     | `u_P`                 | `Minimum_u_P`                 | `Maximum_u_P`                 |               | BETA(`u_P_alpha` , `u_P_beta`)                                                      |
-| **Adverse Event Disutility**                         |                       |                               |                               |               |                                                                                     |
-| Leukopenia                                           | `AE1_DisUtil`         | `Minimum_AE1_DisUtil`         | `Maximum_AE1_DisUtil`         | BRTYA         | `alpha_u_AE1, beta_u_AE1`                                                           |
-| Diarrhea                                             | `AE2_DisUtil`         | `Minimum_AE2_DisUtil`         | `Maximum_AE2_DisUtil`         | BETA          | `alpha_u_AE2, beta_u_AE2`                                                           |
-| Vomiting                                             | `AE3_DisUtil`         | `Minimum_AE3_DisUtil`         | `Maximum_AE3_DisUtil`         | BETA          | `alpha_u_AE3, beta_u_AE3`                                                           |
-| **Hazard Ratios**                                    |                       |                               |                               |               |                                                                                     |
-| PFS to OS under the Experimental Strategy            | `HR_FP_Exp`           | `Minimum_HR_FP_Exp`           | `Maximum_HR_FP_Exp`           | [@smeets2018] | rlnorm()                                                                            |
-| OS to PFS under the Experimental Strategy            | `HR_PD_Exp`           | `Minimum_HR_PD_Exp`           | `Maximum_HR_PD_Exp`           | [@smeets2018] | rlnorm()                                                                            |
-| **Probability of Dying under Second-Line Treatment** | `P_OSD_SoC`           | `Minimum_P_OSD_SoC`           | `Maximum_P_OSD_SoC`           |               | BETA(`P_OSD_SoC_alpha`, `P_OSD_SoC_beta`)                                           |
-| **Discount Rate**                                    |                       |                               |                               |               |                                                                                     |
-| Costs                                                | `d_c`                 | 0                             | 0.08                          |               |                                                                                     |
-| Outcomes                                             | `d_e`                 | 0                             | 0.08                          |               |                                                                                     |
+| **Cost (Per Cycle)** |  |  |  |  |  |
+| FOLFOX | `c_PFS_Folfox` | `Minimum_c_PFS_Folfox` | `Maximum_c_PFS_Folfox` |  | GAMMA(`a.cIntervention_c_PFS_Folfox`, `b.cIntervention_c_PFS_Folfox`) |
+| FOLFIRI | `c_OS_Folfiri` | `Minimum_c_OS_Folfiri` | `Maximum_c_OS_Folfiri` |  | GAMMA(`a.cIntervention_c_OS_Folfiri`, `b.cIntervention_c_OS_Folfiri`) |
+| Bevacizumab | `c_PFS_Bevacizumab` | `Minimum_c_PFS_Bevacizumab` | `Maximum_c_PFS_Bevacizumab` |  | GAMMA( `a.cIntervention_c_PFS_Bevacizumab`, `b.cIntervention_c_PFS_Bevacizumab` ) |
+| Administration Cost | `administration_cost` | `Minimum_administration_cost` | `Maximum_administration_cost` |  | GAMMA(`a.cIntervention_administration_cost`, `b.cIntervention_administration_cost`) |
+| **Adverse Event Cost** |  |  |  |  |  |
+| Leukopenia | `c_AE1` | `Minimum_c_AE1` | `Maximum_c_AE1` |  | `GAMMA(a.cIntervention_c_AE1, b.cIntervention_c_AE1)` |
+| Diarrhea | `c_AE2` | `Minimum_c_AE2` | `Maximum_c_AE2` |  | `GAMMA(a.cIntervention_c_AE2, b.cIntervention_c_AE2)` |
+| Vomiting | `c_AE3` | `Minimum_c_AE3` | `Maximum_c_AE3` |  | `GAMMA(a.cIntervention_c_AE3, b.cIntervention_c_AE3)` |
+|  |  |  |  |  |  |
+| **Adverse Event Incidence - With Bevacizumab** |  |  |  |  |  |
+| Leukopenia | `p_FA1_Exp` | `Minimum_p_FA1_EXPR` | `Maximum_p_FA1_EXPR` |  | BETA(`alpha_p_FA1_EXPR`, `beta_p_FA1_EXPR`) |
+| Diarrhea | `p_FA2_Exp` | `Minimum_p_FA2_EXPR` | `Maximum_p_FA2_EXPR` |  | BETA(`alpha_p_FA2_EXPR`, `beta_p_FA2_EXPR`) |
+| Vomiting | `p_FA3_Exp` | `Minimum_p_FA3_EXPR` | `Maximum_p_FA3_EXPR` |  | BETA(`alpha_p_FA3_EXPR`, `beta_p_FA3_EXPR`) |
+| **Adverse Event Incidence - Without Bevacizumab** |  |  |  |  |  |
+| Leukopenia | `p_FA1_STD` | `Minimum_p_FA1_STD` | `Maximum_p_FA1_STD` |  | BETA(`alpha_p_FA1_STD` , `beta_p_FA1_STD`) |
+| Diarrhea | `p_FA2_STD` | `Minimum_p_FA2_STD` | `Maximum_p_FA2_STD` |  | BETA(`alpha_p_FA2_STD` , `beta_p_FA2_STD`) |
+| Vomiting | `p_FA3_STD` | `Minimum_p_FA3_STD` | `Maximum_p_FA3_STD` |  | BETA(`alpha_p_FA3_STD` , `beta_p_FA3_STD`) |
+| **Utility (Per Cycle)** |  |  |  |  |  |
+| Progression Free Survival | `u_F` | `Minimum_u_F` | `Maximum_u_F` |  | BETA(`u_F_alpha`, `u_F_beta`) |
+| Overall Survival | `u_P` | `Minimum_u_P` | `Maximum_u_P` |  | BETA(`u_P_alpha` , `u_P_beta`) |
+| **Adverse Event Disutility** |  |  |  |  |  |
+| Leukopenia | `AE1_DisUtil` | `Minimum_AE1_DisUtil` | `Maximum_AE1_DisUtil` | BRTYA | `alpha_u_AE1, beta_u_AE1` |
+| Diarrhea | `AE2_DisUtil` | `Minimum_AE2_DisUtil` | `Maximum_AE2_DisUtil` | BETA | `alpha_u_AE2, beta_u_AE2` |
+| Vomiting | `AE3_DisUtil` | `Minimum_AE3_DisUtil` | `Maximum_AE3_DisUtil` | BETA | `alpha_u_AE3, beta_u_AE3` |
+| **Hazard Ratios** |  |  |  |  |  |
+| PFS to OS under the Experimental Strategy | `HR_FP_Exp` | `Minimum_HR_FP_Exp` | `Maximum_HR_FP_Exp` | [@smeets2018] | rlnorm() |
+| OS to PFS under the Experimental Strategy | `HR_PD_Exp` | `Minimum_HR_PD_Exp` | `Maximum_HR_PD_Exp` | [@smeets2018] | rlnorm() |
+| **Probability of Dying under Second-Line Treatment** | `P_OSD_SoC` | `Minimum_P_OSD_SoC` | `Maximum_P_OSD_SoC` |  | BETA(`P_OSD_SoC_alpha`, `P_OSD_SoC_beta`) |
+| **Discount Rate** |  |  |  |  |  |
+| Costs | `d_c` | 0 | 0.08 |  |  |
+| Outcomes | `d_e` | 0 | 0.08 |  |  |
 
 : Table X Model Parameters Values: Baseline, Ranges and Distributions for Sensitivity Analysis
 
