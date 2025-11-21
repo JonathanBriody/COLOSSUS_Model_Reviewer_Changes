@@ -707,9 +707,10 @@ summary(survfit(Surv(time, status) ~ 1, data = df_TTD), times = 1500)
 
 library(foreign, lib.loc = "C:/Program Files/R/R-4.5.2/library")
 library(readxl)
-OS_WITHBEV <- read_excel("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/OS_WITHBEV.xlsx")
+OS_WITHBEV <- read_excel("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/OS_WITHBEV.xlsx")
 
-PFS_WITHBEV <- read_excel("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/PFS_WITHBEV.xlsx")
+
+PFS_WITHBEV <- read_excel("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/PFS_WITHBEV.xlsx")
 
 # Then we calculate the median survival time as explained by this tutorial:
 
