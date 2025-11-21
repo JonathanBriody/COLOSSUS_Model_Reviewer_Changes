@@ -811,7 +811,20 @@ legend("right",
 
 ```{r}
 
-# Compare the fit numerically based on the AIC
+# =============================================================================
+# Compare the fit numerically based on AIC and BIC
+# =============================================================================
+#
+# AIC (Akaike Information Criterion) and BIC (Bayesian Information Criterion)
+# are both measures of model fit that penalize model complexity.
+# BIC applies a stronger penalty for additional parameters than AIC.
+# Lower values indicate better fit.
+#
+# We extract both AIC and BIC from each flexsurvreg fitted model object
+# to compare the candidate parametric survival distributions for TTP.
+# =============================================================================
+
+# Step 1: Extract AIC values for all candidate distributions (as before)
 (v_AIC_TTP <- c(
   exp      = l_TTP_SoC_exp$AIC,
   gamma    = l_TTP_SoC_gamma$AIC,
@@ -821,18 +834,49 @@ legend("right",
   weibull  = l_TTP_SoC_weibull$AIC
 ))
 
+# Step 2: Extract BIC values for all candidate distributions
+# BIC is accessed via the BIC() function or directly from the flexsurvreg object
+# Here we use the direct accessor for consistency with AIC extraction
+(v_BIC_TTP <- c(
+  exp      = BIC(l_TTP_SoC_exp),
+  gamma    = BIC(l_TTP_SoC_gamma),
+  gompertz = BIC(l_TTP_SoC_gompertz),
+  llogis   = BIC(l_TTP_SoC_llogis),
+  lnorm    = BIC(l_TTP_SoC_lnorm),
+  weibull  = BIC(l_TTP_SoC_weibull)
+))
 
-#v_AIC_TTP <- tibble::enframe(v_AIC_TTP)
+# Step 3: Create a tidy data frame combining AIC and BIC for reporting
+# This makes it easy to see which distribution minimizes each criterion
+df_AIC_BIC_TTP <- data.frame(
+  outcome      = "TTP",                           # Outcome being modeled
+  distribution = names(v_AIC_TTP),                # Distribution name
+  AIC          = as.numeric(v_AIC_TTP),          # AIC value
+  BIC          = as.numeric(v_BIC_TTP),          # BIC value
+  stringsAsFactors = FALSE
+)
 
+# Step 4: Order by AIC (ascending) to show best-fitting distributions first
+df_AIC_BIC_TTP <- df_AIC_BIC_TTP[order(df_AIC_BIC_TTP$AIC), ]
 
-# Weibull has the best visual and numerical fit
+# Step 5: Print the table for inclusion in the knitted document
+print(df_AIC_BIC_TTP)
 
+# Step 6: Save the table as a CSV file for use in manuscript/supplement
+# Create an 'outputs' directory if it doesn't already exist
+if (!dir.exists("outputs")) {
+  dir.create("outputs", recursive = TRUE)
+}
 
-# tab_df(,
-# title = "AIC Values", #always give
-# #your tables
-# #titles
-# file = "v_AIC_TTP.doc")
+# Write the AIC/BIC table to a CSV file
+write.csv(
+  df_AIC_BIC_TTP,
+  file = "outputs/AIC_BIC_TTP.csv",
+  row.names = FALSE
+)
+
+# Note: Weibull has the best visual and numerical fit based on AIC
+# You can verify this by inspecting the printed table above
 
 ```
 
@@ -914,7 +958,20 @@ legend("right",
 
 ```{r}
 
-# Compare the fit numerically based on the AIC
+# =============================================================================
+# Compare the fit numerically based on AIC and BIC
+# =============================================================================
+#
+# AIC (Akaike Information Criterion) and BIC (Bayesian Information Criterion)
+# are both measures of model fit that penalize model complexity.
+# BIC applies a stronger penalty for additional parameters than AIC.
+# Lower values indicate better fit.
+#
+# We extract both AIC and BIC from each flexsurvreg fitted model object
+# to compare the candidate parametric survival distributions for TTD.
+# =============================================================================
+
+# Step 1: Extract AIC values for all candidate distributions (as before)
 (v_AIC_TTD <- c(
   exp      = l_TTD_SoC_exp$AIC,
   gamma    = l_TTD_SoC_gamma$AIC,
@@ -924,7 +981,49 @@ legend("right",
   weibull  = l_TTD_SoC_weibull$AIC
 ))
 
-# Weibull has the best visual and numerical fit
+# Step 2: Extract BIC values for all candidate distributions
+# BIC is accessed via the BIC() function or directly from the flexsurvreg object
+# Here we use the BIC() function which works on flexsurvreg model objects
+(v_BIC_TTD <- c(
+  exp      = BIC(l_TTD_SoC_exp),
+  gamma    = BIC(l_TTD_SoC_gamma),
+  gompertz = BIC(l_TTD_SoC_gompertz),
+  llogis   = BIC(l_TTD_SoC_llogis),
+  lnorm    = BIC(l_TTD_SoC_lnorm),
+  weibull  = BIC(l_TTD_SoC_weibull)
+))
+
+# Step 3: Create a tidy data frame combining AIC and BIC for reporting
+# This makes it easy to see which distribution minimizes each criterion
+df_AIC_BIC_TTD <- data.frame(
+  outcome      = "TTD",                           # Outcome being modeled
+  distribution = names(v_AIC_TTD),                # Distribution name
+  AIC          = as.numeric(v_AIC_TTD),          # AIC value
+  BIC          = as.numeric(v_BIC_TTD),          # BIC value
+  stringsAsFactors = FALSE
+)
+
+# Step 4: Order by AIC (ascending) to show best-fitting distributions first
+df_AIC_BIC_TTD <- df_AIC_BIC_TTD[order(df_AIC_BIC_TTD$AIC), ]
+
+# Step 5: Print the table for inclusion in the knitted document
+print(df_AIC_BIC_TTD)
+
+# Step 6: Save the table as a CSV file for use in manuscript/supplement
+# Create an 'outputs' directory if it doesn't already exist
+if (!dir.exists("outputs")) {
+  dir.create("outputs", recursive = TRUE)
+}
+
+# Write the AIC/BIC table to a CSV file
+write.csv(
+  df_AIC_BIC_TTD,
+  file = "outputs/AIC_BIC_TTD.csv",
+  row.names = FALSE
+)
+
+# Note: Weibull has the best visual and numerical fit based on AIC
+# You can verify this by inspecting the printed table above
 ```
 
 ```{r}
