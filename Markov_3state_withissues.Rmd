@@ -366,11 +366,11 @@ country_min_discount_rate     <- 0.00
 # Load the individual patient data for the time-to-progression (TTP) that you recovered by digitising published survival curves (actually, Ian Miller gave us the Angiopredict data directly).
 
 # df_TTP <- read.csv(file='PFS.csv', header=TRUE)
-# save.image("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTP.RData")
+# save.image("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTP.RData")
 # df_TTD <- read.csv(file='OS.csv', header=TRUE)
-# save.image("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTD.RData")
+# save.image("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTD.RData")
 
-#load("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model_Data/df_TTP.RData")
+#load("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model_Data/df_TTP.RData")
 # Load the individual patient data for the time-to-progression (TTP) that you recovered by digitising published survival curves (actually, Ian Miller gave us the Angiopredict data directly).
 
 # Previously I loaded this simply as the below:
@@ -380,7 +380,7 @@ load(file = "df_TTP.RData")
 
 
 
-#load("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model_Data/df_TTD.RData")
+#load("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model_Data/df_TTD.RData")
 # I have time-to-death (TTD) data, I'll load it in here.
 
 
@@ -704,9 +704,9 @@ summary(survfit(Surv(time, status) ~ 1, data = df_TTD), times = 1500)
 
 library(foreign, lib.loc = "C:/Program Files/R/R-4.2.2/library")
 library(readxl)
-OS_WITHBEV <- read_excel("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/OS_WITHBEV.xlsx")
+OS_WITHBEV <- read_excel("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/OS_WITHBEV.xlsx")
 
-PFS_WITHBEV <- read_excel("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/PFS_WITHBEV.xlsx")
+PFS_WITHBEV <- read_excel("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/AngioPredict/Model Data/PFS_WITHBEV.xlsx")
 
 # Then we calculate the median survival time as explained by this tutorial:
 
@@ -955,9 +955,9 @@ coef_TTD_weibull_scale_SoC <- l_TTD_SoC_weibull$coefficients["scale"]
 
 # 
 # df_TTP_EXP <- read.csv(file='PFS_WITHBEV.csv', header=TRUE)
-# save.image("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTP_EXP.RData")
+# save.image("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTP_EXP.RData")
 # df_TTD_EXP <- read.csv(file='OS_WITHBEV.csv', header=TRUE)
-# save.image("C:\Users\jonat\OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTD_EXP.RData")
+# save.image("C:/Users/jonat/OneDrive - Royal College of Surgeons in Ireland/COLOSSUS/R Code/GitHub/COLOSSUS_Model/df_TTD_EXP.RData")
 
 # Previously I loaded this simply as the below:
 # load(file = "df_TTP_EXP.RData")
