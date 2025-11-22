@@ -7906,7 +7906,7 @@ This paper says in technical terms which distributions fit and why:
 Model Parameter Estimation and Uncertainty Analysis: A Report of the ISPOR-SMDM Modeling Good Research Practices Task Force Working Group--6 <file:///C:/Users/Jonathan/OneDrive%20-%20Royal%20College%20of%20Surgeons%20in%20Ireland/COLOSSUS/Briggs%20et%20al%202012%20model%20parameter%20estimation%20and%20uncertainty.pdf>
 
 | Parameter | Base Case Value | Minimum Value | Maximum Value | Source | Distribution |
-|------------|------------|------------|------------|------------|------------|
+|----|----|----|----|----|----|
 | **Cost (Per Cycle)** |  |  |  |  |  |
 | FOLFOX | `c_PFS_Folfox` | `Minimum_c_PFS_Folfox` | `Maximum_c_PFS_Folfox` |  | GAMMA(`a.cIntervention_c_PFS_Folfox`, `b.cIntervention_c_PFS_Folfox`) |
 | FOLFIRI | `c_OS_Folfiri` | `Minimum_c_OS_Folfiri` | `Maximum_c_OS_Folfiri` |  | GAMMA(`a.cIntervention_c_OS_Folfiri`, `b.cIntervention_c_OS_Folfiri`) |
