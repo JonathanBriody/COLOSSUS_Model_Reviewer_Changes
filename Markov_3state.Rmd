@@ -5367,7 +5367,7 @@ tornado_plot_top10 <- tornado_plot_top10 +
   # y = sets the y-axis label (this is the parameter axis)
   # Health economic best practice: Clear, simple labels
   # Modeling interpretation: Labeling both axes
-  labs(x = "Outcome", y = "Parameter")
+  labs(x = "ICER (€ per QALY)", y = "Parameter")
 
 # Create a descriptive title that includes:
 # 1. What it is: "Tornado Plot"
@@ -5715,7 +5715,7 @@ unlimited_tornado_plot_top10 <- owsa_tornado(
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
   # Label both axes
   # Identical to the limited version
-  labs(x = "Outcome", y = "Parameter")
+  labs(x = "ICER (€ per QALY)", y = "Parameter")
 
 # Create a title indicating this is the unlimited scale version
 # We add "Unlimited Scale" to the title to distinguish it from the limited version
