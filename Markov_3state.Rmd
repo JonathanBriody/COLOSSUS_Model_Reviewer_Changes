@@ -5044,27 +5044,67 @@ plot_title <- paste("Tornado Plot", country_name[1])
 # For axis labels, vjust controls how far the label is from the axis line.
 # A value of 0.25 provides a small offset for readability.
 
+# ============================================================================
+# STEP 4A: CREATE SUBTITLE WITH COUNTRY CONTEXT AND WTP INTERPRETATION
+# ============================================================================
+#
+# HEALTH ECONOMIC PURPOSE:
+# -----------------------------------------------------------------------------
+# The subtitle provides critical context for interpreting the tornado plot:
+# 1. COUNTRY IDENTIFICATION: Reminds readers which country's analysis is shown
+# 2. COST-EFFECTIVENESS CONCLUSION: Indicates whether the intervention is
+#    cost-effective across all parameter variations
+#
+# INTERPRETATION:
+# -----------------------------------------------------------------------------
+# "All usual willingness-to-pay thresholds are exceeded in all variations"
+# means that the ICER remains above typical WTP thresholds regardless of
+# which parameter is varied. This indicates the intervention is NOT
+# cost-effective under standard decision rules, and this conclusion is
+# ROBUST to parameter uncertainty.
+#
+# This is a key finding because it shows that no single parameter change
+# (within plausible ranges) would make the intervention cost-effective.
+
+# Create informative subtitle with country and WTP interpretation
+# -----------------------------------------------------------------
+plot_subtitle <- paste0(
+  country_name[1],
+  ": All usual willingness-to-pay thresholds are exceeded in all variations"
+)
+
 # Add title and apply professional formatting
 # --------------------------------------------
-# This single line of code performs three operations (chained with +):
+# This code performs four operations (chained with +):
 #
-# 1. ggtitle(plot_title): Adds the title we created above
+# 1. ggtitle(plot_title): Adds the main title
 #
-# 2. theme(plot.title = element_text(hjust = 0.5)): Centers the title
+# 2. labs(subtitle = plot_subtitle): Adds the subtitle below the title
+#    - subtitle: parameter for adding explanatory text below the title
+#    - Automatically formatted smaller than the main title
+#
+# 3. theme(plot.title = element_text(hjust = 0.5)): Centers the title
 #    - plot.title: selects the title element
 #    - element_text(): function for modifying text properties
 #    - hjust = 0.5: centers the title horizontally
 #
-# 3. theme(axis.title.y = element_text(vjust = 0.25)): Adjusts y-axis label
+# 4. theme(plot.subtitle = element_text(hjust = 0.5)): Centers the subtitle
+#    - plot.subtitle: selects the subtitle element
+#    - hjust = 0.5: centers the subtitle to align with the centered title
+#
+# 5. theme(axis.title.y = element_text(vjust = 0.25)): Adjusts y-axis label
 #    - axis.title.y: selects the y-axis label (visual horizontal axis for ICER)
 #    - vjust = 0.25: positions label with slight offset from axis
 #
-# Health economic value: Professional presentation enhances credibility and
-# ensures the analysis is taken seriously by decision-makers and peer reviewers
+# Health economic value: Professional presentation with clear interpretation
+# enhances credibility and ensures decision-makers understand the robustness
+# of the cost-effectiveness conclusion
 tornado_plot <- tornado_plot +
   ggtitle(plot_title) +
+  labs(subtitle = plot_subtitle) +
   theme(
     plot.title = element_text(hjust = 0.5),       # Center the title
+    plot.subtitle = element_text(hjust = 0.5),    # Center the subtitle
     axis.title.y = element_text(vjust = 0.25)     # Adjust y-axis label position
   )
 
@@ -5218,14 +5258,26 @@ unlimited_tornado_plot <- unlimited_tornado_plot + labs(y = "ICER")
 # we rely on the filename to differentiate them.
 plot_title <- paste("Tornado Plot", country_name[1])
 
-# Apply identical formatting (centered title, adjusted axis label)
-# -----------------------------------------------------------------
+# Create identical subtitle for consistency
+# -------------------------------------------
+# Use the same subtitle as the limited version to ensure both plots
+# communicate the same key finding about cost-effectiveness robustness
+plot_subtitle <- paste0(
+  country_name[1],
+  ": All usual willingness-to-pay thresholds are exceeded in all variations"
+)
+
+# Apply identical formatting (centered title, subtitle, and adjusted axis label)
+# -------------------------------------------------------------------------------
 # Use the same theme settings to ensure visual consistency between the two
 # versions. The only difference should be the axis limits, not the styling.
+# Both plots should communicate the same interpretation via the subtitle.
 unlimited_tornado_plot <- unlimited_tornado_plot +
   ggtitle(plot_title) +
+  labs(subtitle = plot_subtitle) +
   theme(
     plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
     axis.title.y = element_text(vjust = 0.25)
   )
 
