@@ -9148,6 +9148,881 @@ cat("\nFormatted summary table saved to:", formatted_filename, "\n\n")
 
 ```{r}
 
+# ============================================================================
+# SECTION 09.1.2: CONSOLIDATE PSA RESULTS ACROSS ALL COUNTRIES
+# ============================================================================
+#
+# HEALTH ECONOMIC PURPOSE:
+# -----------------------------------------------------------------------------
+# This section creates a CONSOLIDATED summary table that combines PSA-based
+# NMB and credible interval results from all three country analyses
+# (Ireland, Germany, and Spain) into a single table for manuscript reporting.
+#
+# WHY CONSOLIDATE ACROSS COUNTRIES?
+# -----------------------------------------------------------------------------
+# The main analysis runs separately for each country because:
+# 1. Different treatment costs (country-specific pricing and reimbursement)
+# 2. Different adverse event costs (healthcare system differences)
+# 3. Different WTP thresholds (societal preferences and affordability)
+# 4. Different discount rates (national HTA agency requirements)
+#
+# However, for manuscript Table 2, we want a SINGLE table showing results
+# for all countries side-by-side, allowing readers to compare:
+# - Whether cost-effectiveness conclusions differ by country
+# - How parameter uncertainty (CrIs) varies across healthcare systems
+# - The impact of different WTP thresholds on NMB
+#
+# WORKFLOW:
+# -----------------------------------------------------------------------------
+# Each country analysis (Ireland, Germany, Spain) must be run separately:
+#
+# STEP 1: Uncomment Ireland country block → Run PSA → Generates:
+#   - output/PSA_Summary_NMB_Ireland.csv
+#   - output/PSA_Summary_NMB_Formatted_Ireland.csv
+#
+# STEP 2: Uncomment Germany country block → Run PSA → Generates:
+#   - output/PSA_Summary_NMB_Germany.csv
+#   - output/PSA_Summary_NMB_Formatted_Germany.csv
+#
+# STEP 3: Uncomment Spain country block → Run PSA → Generates:
+#   - output/PSA_Summary_NMB_Spain.csv
+#   - output/PSA_Summary_NMB_Formatted_Spain.csv
+#
+# STEP 4: Run THIS chunk → Consolidates all country results into:
+#   - output/PSA_Summary_NMB_All_Countries.csv (raw data)
+#   - output/PSA_Summary_NMB_All_Countries_Formatted.csv (publication-ready)
+#
+# HEALTH ECONOMIC INTERPRETATION:
+# -----------------------------------------------------------------------------
+# The consolidated table allows assessment of:
+#
+# 1. TRANSFERABILITY: Do cost-effectiveness conclusions transfer across countries?
+#    - If NMB is negative in all countries → robust evidence against adoption
+#    - If NMB varies by country → need country-specific decision-making
+#
+# 2. UNCERTAINTY: How does parameter uncertainty differ across settings?
+#    - Wider CrIs suggest more uncertain cost-effectiveness
+#    - If CrI spans zero → high decision uncertainty (may need more research)
+#
+# 3. THRESHOLD SENSITIVITY: How does WTP threshold affect conclusions?
+#    - Ireland (€45k) vs Spain (€30k) vs Germany (€79k)
+#    - Higher WTP → more likely to have positive NMB
+#
+# DATA STRUCTURE REQUIREMENTS:
+# -----------------------------------------------------------------------------
+# This chunk expects the following files to exist in the output/ directory:
+# - PSA_Summary_NMB_Ireland.csv
+# - PSA_Summary_NMB_Germany.csv
+# - PSA_Summary_NMB_Spain.csv
+#
+# Each file should contain one row with columns:
+# - Country, WTP_Threshold
+# - Incremental_Cost_Mean, Incremental_Cost_Lower_CrI, Incremental_Cost_Upper_CrI
+# - Incremental_QALY_Mean, Incremental_QALY_Lower_CrI, Incremental_QALY_Upper_CrI
+# - Incremental_NMB_Mean, Incremental_NMB_Lower_CrI, Incremental_NMB_Upper_CrI
+#
+# If any files are missing, this chunk will display a warning and show
+# results for available countries only.
+
+# ============================================================================
+# STEP 1: CHECK WHICH COUNTRY PSA RESULTS ARE AVAILABLE
+# ============================================================================
+#
+# DEFENSIVE PROGRAMMING RATIONALE:
+# -----------------------------------------------------------------------------
+# We cannot assume all three country analyses have been run. The user may:
+# - Still be working through the countries sequentially
+# - Have re-run one country after making changes
+# - Be testing with a subset of countries
+#
+# Therefore, we check which files exist before attempting to load them.
+#
+# file.exists() FUNCTION:
+# Returns TRUE if the file exists, FALSE otherwise
+# Prevents errors from trying to read non-existent files
+#
+# file.path() FUNCTION:
+# Constructs platform-independent file paths
+# - Windows: "output\\PSA_Summary_NMB_Ireland.csv"
+# - Mac/Linux: "output/PSA_Summary_NMB_Ireland.csv"
+
+# Define file paths for each country's PSA summary
+# -------------------------------------------------
+# We use the raw (non-formatted) files because they contain full numerical
+# precision needed for combining data and further calculations
+#
+# Health economic value: Ensures reproducibility by using unrounded values
+file_ireland <- file.path("output", "PSA_Summary_NMB_Ireland.csv")
+file_germany <- file.path("output", "PSA_Summary_NMB_Germany.csv")
+file_spain <- file.path("output", "PSA_Summary_NMB_Spain.csv")
+
+# Check which files exist
+# -----------------------
+# Creates logical (TRUE/FALSE) variables for each country
+# These will be used to conditionally load data below
+#
+# Modelling approach: Graceful handling of missing data allows partial
+# consolidation (e.g., if only Ireland and Germany have been run)
+exists_ireland <- file.exists(file_ireland)
+exists_germany <- file.exists(file_germany)
+exists_spain <- file.exists(file_spain)
+
+# Display which country results are available
+# --------------------------------------------
+# Console output informs the user which countries will be included
+# in the consolidated table
+#
+# Health economic value: Transparency about which analyses contribute
+# to the final consolidated results
+cat("\n=======================================================\n")
+cat("CONSOLIDATING PSA RESULTS ACROSS COUNTRIES\n")
+cat("=======================================================\n\n")
+cat("Checking for available PSA summary files...\n\n")
+
+# Report availability status for each country
+# --------------------------------------------
+# ifelse() creates conditional text output:
+# - If file exists: "✓ Available"
+# - If file missing: "✗ Not yet generated"
+cat("Ireland:", ifelse(exists_ireland, "✓ Available", "✗ Not yet generated"), "\n")
+cat("Germany:", ifelse(exists_germany, "✓ Available", "✗ Not yet generated"), "\n")
+cat("Spain:  ", ifelse(exists_spain, "✓ Available", "✗ Not yet generated"), "\n\n")
+
+# ============================================================================
+# STEP 2: LOAD AVAILABLE COUNTRY PSA RESULTS
+# ============================================================================
+#
+# DATA LOADING STRATEGY:
+# -----------------------------------------------------------------------------
+# We use a list to collect data frames for each country that has results.
+# Lists in R are flexible containers that can hold multiple data frames
+# of varying lengths and structures.
+#
+# ADVANTAGES OF USING A LIST:
+# 1. Can dynamically add elements (countries) as we find them
+# 2. Handles cases where only 1, 2, or 3 countries are available
+# 3. Easy to combine into single data frame using do.call(rbind, list)
+#
+# HEALTH ECONOMIC RATIONALE:
+# We load raw (non-formatted) files to preserve full numerical precision
+# for any subsequent calculations or rounding decisions
+
+# Initialize empty list to store country data frames
+# ---------------------------------------------------
+# list() creates an empty container
+# We'll append each country's data frame to this list
+#
+# Modelling approach: Flexible data structure accommodates any number
+# of available country results (1, 2, or 3)
+psa_list <- list()
+
+# Load Ireland data if available
+# -------------------------------
+# CONDITIONAL LOADING:
+# if (exists_ireland) checks whether the Ireland file was found above
+# Only executes the code block if TRUE (file exists)
+#
+# read.csv() PARAMETERS:
+# - stringsAsFactors = FALSE: Keep text as character strings, not factors
+#   This preserves country names and makes data manipulation easier
+#
+# LIST ASSIGNMENT:
+# psa_list[["Ireland"]] adds the data frame to the list with name "Ireland"
+# Named list elements allow us to track which country each data frame represents
+#
+# Health economic interpretation: Loading Ireland's PSA results including
+# costs, QALYs, NMB at €45,000 WTP threshold
+if (exists_ireland) {
+  # Read the CSV file containing Ireland PSA summary
+  # Each row contains mean and 95% CrI for incremental cost, QALY, and NMB
+  psa_list[["Ireland"]] <- read.csv(file_ireland, stringsAsFactors = FALSE)
+
+  # Console feedback confirms successful loading
+  # Shows how many rows loaded (should be 1 for single-country file)
+  cat("✓ Loaded Ireland results (", nrow(psa_list[["Ireland"]]), " row)\n")
+}
+
+# Load Germany data if available
+# -------------------------------
+# Same structure as Ireland loading above
+#
+# Health economic interpretation: Loading Germany's PSA results including
+# costs, QALYs, NMB at €78,871 WTP threshold (higher than Ireland/Spain)
+if (exists_germany) {
+  # Read the CSV file containing Germany PSA summary
+  psa_list[["Germany"]] <- read.csv(file_germany, stringsAsFactors = FALSE)
+
+  # Console feedback
+  cat("✓ Loaded Germany results (", nrow(psa_list[["Germany"]]), " row)\n")
+}
+
+# Load Spain data if available
+# -----------------------------
+# Same structure as Ireland and Germany loading above
+#
+# Health economic interpretation: Loading Spain's PSA results including
+# costs, QALYs, NMB at €30,000 WTP threshold (lowest of the three countries)
+if (exists_spain) {
+  # Read the CSV file containing Spain PSA summary
+  psa_list[["Spain"]] <- read.csv(file_spain, stringsAsFactors = FALSE)
+
+  # Console feedback
+  cat("✓ Loaded Spain results (", nrow(psa_list[["Spain"]]), " row)\n")
+}
+
+# ============================================================================
+# STEP 3: COMBINE COUNTRY RESULTS INTO CONSOLIDATED TABLE
+# ============================================================================
+#
+# COMBINING DATA FRAMES:
+# -----------------------------------------------------------------------------
+# We use do.call(rbind, list) to stack country data frames vertically.
+#
+# WHAT IS do.call()?
+# do.call(function, list_of_arguments) applies a function to a list of arguments
+# Example: do.call(rbind, list(df1, df2, df3)) is equivalent to rbind(df1, df2, df3)
+#
+# WHAT IS rbind()?
+# rbind() stands for "row bind" - it stacks data frames vertically
+# Requirements: All data frames must have the same columns
+# Result: A single data frame with rows from all input data frames
+#
+# EXAMPLE:
+# If Ireland data has 1 row, Germany has 1 row, Spain has 1 row:
+# rbind() creates a 3-row data frame with all results combined
+#
+# HEALTH ECONOMIC VALUE:
+# Creates a single table for Table 2 in the manuscript, showing all countries
+# side-by-side for easy comparison of cost-effectiveness across settings
+
+# Check if any country data was loaded
+# -------------------------------------
+# length(psa_list) returns the number of elements in the list
+# If 0, no country files were found → display warning and skip consolidation
+# If ≥1, proceed with combining available data
+#
+# Defensive programming: Prevents errors from trying to combine empty list
+if (length(psa_list) == 0) {
+
+  # WARNING MESSAGE:
+  # -----------------------------------------------------------------------------
+  # Alerts the user that no PSA summary files were found
+  # Provides guidance on how to generate the required files
+  #
+  # Health economic interpretation: Cannot consolidate results until individual
+  # country PSAs have been run
+  cat("\n⚠ WARNING: No PSA summary files found!\n")
+  cat("\nTo generate PSA summaries:\n")
+  cat("1. Uncomment the Ireland country block and run the PSA section\n")
+  cat("2. Uncomment the Germany country block and run the PSA section\n")
+  cat("3. Uncomment the Spain country block and run the PSA section\n")
+  cat("4. Re-run this consolidation chunk\n\n")
+
+  # Create empty placeholder to avoid errors in subsequent code
+  # This data frame has the correct column structure but zero rows
+  psa_consolidated <- data.frame(
+    Country = character(),
+    WTP_Threshold = numeric(),
+    Incremental_Cost_Mean = numeric(),
+    Incremental_Cost_Lower_CrI = numeric(),
+    Incremental_Cost_Upper_CrI = numeric(),
+    Incremental_QALY_Mean = numeric(),
+    Incremental_QALY_Lower_CrI = numeric(),
+    Incremental_QALY_Upper_CrI = numeric(),
+    Incremental_NMB_Mean = numeric(),
+    Incremental_NMB_Lower_CrI = numeric(),
+    Incremental_NMB_Upper_CrI = numeric(),
+    stringsAsFactors = FALSE
+  )
+
+} else {
+
+  # COMBINE AVAILABLE COUNTRY DATA:
+  # ---------------------------------------------------------------------------
+  # do.call(rbind, psa_list) stacks all available country data frames vertically
+  #
+  # If all 3 countries available → 3-row table
+  # If only 2 countries available → 2-row table
+  # If only 1 country available → 1-row table
+  #
+  # Health economic interpretation: Creating consolidated PSA summary table
+  # with incremental costs, QALYs, and NMB (with 95% CrIs) for each country
+  psa_consolidated <- do.call(rbind, psa_list)
+
+  # Reset row names to simple sequential numbering
+  # -----------------------------------------------
+  # By default, rbind() preserves row names from original data frames
+  # This can create messy row names like "Ireland.1", "Germany.1", etc.
+  # Setting row.names = NULL creates clean sequential numbering (1, 2, 3...)
+  #
+  # Cosmetic improvement for cleaner output
+  row.names(psa_consolidated) <- NULL
+
+  # Confirm successful consolidation
+  # ---------------------------------
+  # Shows how many countries were included in the consolidated table
+  # This serves as a quality check (should match number of files found)
+  cat("\n✓ Successfully consolidated results from", nrow(psa_consolidated), "country/countries\n\n")
+}
+
+# ============================================================================
+# STEP 4: DISPLAY CONSOLIDATED RAW TABLE
+# ============================================================================
+#
+# TABLE DISPLAY PURPOSE:
+# -----------------------------------------------------------------------------
+# Shows the consolidated results in the R console for immediate review
+#
+# WHY DISPLAY THE RAW TABLE?
+# 1. Immediate verification that consolidation worked correctly
+# 2. Check that all countries are included
+# 3. Verify WTP thresholds are correct for each country
+# 4. Spot-check that numerical values are sensible (no obvious errors)
+#
+# INTERPRETATION GUIDANCE:
+# -----------------------------------------------------------------------------
+# When reviewing this table, check:
+#
+# FOR INCREMENTAL COSTS:
+# - Should be positive (bevacizumab is expensive → adds costs)
+# - Magnitude should be in €20,000-€40,000 range (biologic therapy cost)
+# - CrI width reflects cost uncertainty
+#
+# FOR INCREMENTAL QALYs:
+# - Should be small positive values (survival extension is modest)
+# - Typically 0.1-0.3 QALYs (a few months of life extension)
+# - CrI width reflects survival benefit uncertainty
+#
+# FOR INCREMENTAL NMB:
+# - May be positive or negative depending on WTP threshold and country
+# - Negative NMB → costs exceed value of health benefits
+# - If entire CrI is negative → strong evidence against cost-effectiveness
+# - If CrI spans zero → uncertain cost-effectiveness
+
+# Display consolidated table header
+# ----------------------------------
+cat("=======================================================\n")
+cat("CONSOLIDATED PSA SUMMARY (RAW DATA - FULL PRECISION)\n")
+cat("=======================================================\n\n")
+
+# Display the data frame
+# ----------------------
+# print() shows the table in standard R format
+# All numeric values displayed with full precision
+#
+# Health economic value: Transparent reporting of exact numerical results
+# for peer review and reproducibility
+if (nrow(psa_consolidated) > 0) {
+  print(psa_consolidated, row.names = FALSE)
+  cat("\n")
+} else {
+  cat("(No data to display - PSA summaries not yet generated)\n\n")
+}
+
+# ============================================================================
+# STEP 5: CREATE FORMATTED VERSION FOR MANUSCRIPT
+# ============================================================================
+#
+# FORMATTING PURPOSE:
+# -----------------------------------------------------------------------------
+# The raw table above is ideal for analysis but not publication-ready.
+# This formatted version applies:
+# 1. Currency symbols (€)
+# 2. Thousand separators (€12,345)
+# 3. Appropriate rounding (costs to €1, QALYs to 4 decimals)
+# 4. Combined "mean (95% CrI)" presentation
+#
+# FORMATTING APPROACH:
+# -----------------------------------------------------------------------------
+# We apply formatting only if data exists (nrow > 0)
+# For each metric, we create human-readable text combining mean and CrI
+#
+# HEALTH ECONOMIC VALUE:
+# Publication-ready table following standard reporting conventions for
+# cost-effectiveness analyses (aligned with CHEERS checklist)
+
+# Only create formatted table if we have data
+# --------------------------------------------
+if (nrow(psa_consolidated) > 0) {
+
+  # Create formatted version of consolidated table
+  # -----------------------------------------------
+  # data.frame() constructs a new table with formatted text columns
+  #
+  # Each row corresponds to one country from psa_consolidated
+  # psa_consolidated$Column_Name accesses that column's values
+  #
+  # FORMATTING FUNCTIONS USED:
+  # - round(x, n): Round to n decimal places
+  # - format(x, big.mark = ","): Add thousand separators
+  # - paste0(): Concatenate strings without separator
+  #
+  # Health economic interpretation: Converting raw numerical results into
+  # publication-ready formatted text for manuscript Table 2
+  psa_consolidated_formatted <- data.frame(
+
+    # Country column: unchanged (already text)
+    # -----------------------------------------
+    # Simply copies the country name from raw table
+    Country = psa_consolidated$Country,
+
+    # WTP threshold: formatted with currency symbol and separators
+    # ------------------------------------------------------------
+    # Example: 45000 → "€45,000"
+    #
+    # Health economic interpretation: Shows the societal willingness-to-pay
+    # threshold used to calculate NMB for each country
+    `WTP Threshold` = paste0("€", format(psa_consolidated$WTP_Threshold, big.mark = ",")),
+
+    # Incremental cost: formatted as "Mean (95% CrI)"
+    # -----------------------------------------------
+    # Example: "€30,847 (€22,086 to €40,747)"
+    #
+    # FORMAT BREAKDOWN:
+    # 1. round(psa_consolidated$Incremental_Cost_Mean, 0): Round mean to nearest €1
+    # 2. format(..., big.mark = ","): Add thousand separators
+    # 3. paste0("€", ...): Add currency symbol
+    # 4. Repeat for lower and upper CrI bounds
+    # 5. Combine with " (" and " to " separators
+    #
+    # Health economic interpretation: Expected additional cost of bevacizumab
+    # with 95% credible interval showing cost uncertainty
+    `Incremental Cost (Mean and 95% CrI)` = paste0(
+      "€", format(round(psa_consolidated$Incremental_Cost_Mean, 0), big.mark = ","),
+      " (€", format(round(psa_consolidated$Incremental_Cost_Lower_CrI, 0), big.mark = ","),
+      " to €", format(round(psa_consolidated$Incremental_Cost_Upper_CrI, 0), big.mark = ","), ")"
+    ),
+
+    # Incremental QALY: formatted as "Mean (95% CrI)"
+    # -----------------------------------------------
+    # Example: "0.1709 (0.0664 to 0.2894)"
+    #
+    # FORMAT BREAKDOWN:
+    # 1. round(psa_consolidated$Incremental_QALY_Mean, 4): Round to 4 decimal places
+    #    (standard precision for QALYs)
+    # 2. No currency symbol or thousand separators (QALYs are small numbers)
+    # 3. Combine with " (" and " to " separators
+    #
+    # Health economic interpretation: Expected health gain from bevacizumab
+    # in quality-adjusted life years, with 95% credible interval showing
+    # uncertainty in the survival benefit
+    `Incremental QALY (Mean and 95% CrI)` = paste0(
+      round(psa_consolidated$Incremental_QALY_Mean, 4),
+      " (", round(psa_consolidated$Incremental_QALY_Lower_CrI, 4),
+      " to ", round(psa_consolidated$Incremental_QALY_Upper_CrI, 4), ")"
+    ),
+
+    # Incremental NMB: formatted as "Mean (95% CrI)"
+    # ----------------------------------------------
+    # Example: "€-23,155 (€-30,496 to €-16,773)"
+    #
+    # FORMAT BREAKDOWN:
+    # Same as incremental cost (currency symbol, thousand separators, rounded to €1)
+    #
+    # SPECIAL HANDLING OF NEGATIVE VALUES:
+    # When NMB is negative, the minus sign appears after the € symbol: "€-23,155"
+    # This is a formatting quirk but doesn't affect interpretation
+    #
+    # Health economic interpretation: Expected net monetary benefit of bevacizumab
+    # at the country-specific WTP threshold, with 95% credible interval
+    #
+    # DECISION RULE:
+    # - Positive NMB → intervention may be cost-effective
+    # - Negative NMB → intervention may not be cost-effective
+    # - If entire CrI is negative → strong evidence against cost-effectiveness
+    `Incremental NMB (Mean and 95% CrI)` = paste0(
+      "€", format(round(psa_consolidated$Incremental_NMB_Mean, 0), big.mark = ","),
+      " (€", format(round(psa_consolidated$Incremental_NMB_Lower_CrI, 0), big.mark = ","),
+      " to €", format(round(psa_consolidated$Incremental_NMB_Upper_CrI, 0), big.mark = ","), ")"
+    ),
+
+    # Preserve column names exactly as specified
+    # -------------------------------------------
+    # check.names = FALSE: Don't convert spaces/parentheses to dots
+    # Without this, R would change "WTP Threshold" to "WTP.Threshold"
+    check.names = FALSE,
+
+    # Keep text as character strings, not factors
+    # --------------------------------------------
+    stringsAsFactors = FALSE
+  )
+
+  # Display formatted consolidated table
+  # -------------------------------------
+  # This is the publication-ready version for manuscript Table 2
+  cat("=======================================================\n")
+  cat("CONSOLIDATED PSA SUMMARY (FORMATTED FOR MANUSCRIPT)\n")
+  cat("=======================================================\n\n")
+  print(psa_consolidated_formatted, row.names = FALSE)
+  cat("\n")
+
+} else {
+  # No data available message
+  # --------------------------
+  cat("\n(Formatted table not created - no PSA data available)\n\n")
+}
+
+# ============================================================================
+# STEP 6: SAVE CONSOLIDATED TABLES TO CSV FILES
+# ============================================================================
+#
+# FILE OUTPUT PURPOSE:
+# -----------------------------------------------------------------------------
+# We save TWO versions of the consolidated table:
+#
+# 1. RAW VERSION (PSA_Summary_NMB_All_Countries.csv):
+#    - Full numerical precision
+#    - Suitable for further analysis
+#    - Can import into R for calculations
+#
+# 2. FORMATTED VERSION (PSA_Summary_NMB_All_Countries_Formatted.csv):
+#    - Publication-ready formatting
+#    - Currency symbols and thousand separators
+#    - Ready to copy into manuscript Word document
+#
+# FILE ORGANIZATION:
+# Both files saved to output/ directory alongside individual country files
+#
+# VERSION CONTROL:
+# CSV files can be tracked in Git to monitor how results change over time
+#
+# REPRODUCIBILITY:
+# Permanent record of consolidated PSA results for all countries
+
+# Save raw consolidated table (if data exists)
+# --------------------------------------------
+if (nrow(psa_consolidated) > 0) {
+
+  # Define output file path
+  # -----------------------
+  # file.path() creates platform-independent path
+  consolidated_raw_file <- file.path("output", "PSA_Summary_NMB_All_Countries.csv")
+
+  # Write to CSV
+  # ------------
+  # row.names = FALSE: Don't include row numbers in CSV
+  # This makes the file cleaner and easier to import into other tools
+  #
+  # Health economic value: Preserves full numerical precision for
+  # transparent reporting and reproducibility
+  write.csv(psa_consolidated, file = consolidated_raw_file, row.names = FALSE)
+
+  # Confirm successful save with file path
+  cat("✓ Raw consolidated table saved to:", consolidated_raw_file, "\n")
+}
+
+# Save formatted consolidated table (if data exists)
+# ---------------------------------------------------
+if (nrow(psa_consolidated) > 0) {
+
+  # Define output file path
+  # -----------------------
+  consolidated_formatted_file <- file.path("output", "PSA_Summary_NMB_All_Countries_Formatted.csv")
+
+  # Write to CSV
+  # ------------
+  # Same parameters as raw table above
+  #
+  # Health economic value: Publication-ready formatted output that can be
+  # directly copied into manuscript Table 2, reducing transcription errors
+  write.csv(psa_consolidated_formatted, file = consolidated_formatted_file, row.names = FALSE)
+
+  # Confirm successful save with file path
+  cat("✓ Formatted consolidated table saved to:", consolidated_formatted_file, "\n\n")
+}
+
+# ============================================================================
+# STEP 7: PROVIDE PLAIN-LANGUAGE INTERPRETATION OF RESULTS
+# ============================================================================
+#
+# INTERPRETATION PURPOSE:
+# -----------------------------------------------------------------------------
+# Translates statistical results into decision-relevant findings that
+# stakeholders (clinicians, policymakers, patients) can understand.
+#
+# FOCUS AREAS:
+# 1. Overall cost-effectiveness conclusion (is NMB positive or negative?)
+# 2. Strength of evidence (how wide are the credible intervals?)
+# 3. Consistency across countries (do all countries reach same conclusion?)
+# 4. Impact of WTP threshold (how sensitive are results to threshold choice?)
+#
+# HEALTH ECONOMIC VALUE:
+# Makes technical PSA results accessible to non-specialist audiences
+
+# Only provide interpretation if we have data
+# --------------------------------------------
+if (nrow(psa_consolidated) > 0) {
+
+  cat("=======================================================\n")
+  cat("PLAIN-LANGUAGE INTERPRETATION OF PSA RESULTS\n")
+  cat("=======================================================\n\n")
+
+  # INTERPRETATION 1: Overall cost-effectiveness by country
+  # --------------------------------------------------------
+  cat("1. COST-EFFECTIVENESS CONCLUSIONS:\n")
+  cat("-----------------------------------\n\n")
+
+  # Loop through each country to provide specific interpretation
+  # -------------------------------------------------------------
+  # for loop iterates through each row of the consolidated table
+  # i takes values 1, 2, 3 (or fewer if not all countries available)
+  for (i in 1:nrow(psa_consolidated)) {
+
+    # Extract values for this country
+    # --------------------------------
+    # Makes code more readable by assigning clear variable names
+    country <- psa_consolidated$Country[i]
+    wtp <- psa_consolidated$WTP_Threshold[i]
+    nmb_mean <- psa_consolidated$Incremental_NMB_Mean[i]
+    nmb_lower <- psa_consolidated$Incremental_NMB_Lower_CrI[i]
+    nmb_upper <- psa_consolidated$Incremental_NMB_Upper_CrI[i]
+
+    # Country-specific interpretation based on NMB sign and CrI
+    # ----------------------------------------------------------
+    cat(country, "(WTP = €", format(wtp, big.mark = ","), "):\n", sep = "")
+
+    # CASE 1: Entire 95% CrI is below zero (strong evidence AGAINST)
+    # ---------------------------------------------------------------
+    # Both lower and upper bounds are negative
+    # → 95% confident that NMB is negative
+    # → Strong evidence that intervention is NOT cost-effective
+    #
+    # Health economic interpretation: Very high confidence that costs exceed
+    # benefits when valued at the WTP threshold
+    if (nmb_upper < 0) {
+      cat("  → Mean NMB is €", format(round(nmb_mean, 0), big.mark = ","), " (NEGATIVE)\n", sep = "")
+      cat("  → 95% CrI entirely below zero: [€", format(round(nmb_lower, 0), big.mark = ","),
+          " to €", format(round(nmb_upper, 0), big.mark = ","), "]\n", sep = "")
+      cat("  → INTERPRETATION: Strong evidence that bevacizumab is NOT cost-effective\n")
+      cat("     at the €", format(wtp, big.mark = ","), " WTP threshold.\n", sep = "")
+      cat("     We are 95% confident that costs exceed the value of health benefits.\n")
+      cat("     Bevacizumab should NOT be adopted at this threshold.\n\n")
+
+    # CASE 2: Entire 95% CrI is above zero (strong evidence FOR)
+    # -----------------------------------------------------------
+    # Both lower and upper bounds are positive
+    # → 95% confident that NMB is positive
+    # → Strong evidence that intervention IS cost-effective
+    #
+    # Health economic interpretation: Very high confidence that benefits
+    # (valued at WTP) exceed costs
+    } else if (nmb_lower > 0) {
+      cat("  → Mean NMB is €", format(round(nmb_mean, 0), big.mark = ","), " (POSITIVE)\n", sep = "")
+      cat("  → 95% CrI entirely above zero: [€", format(round(nmb_lower, 0), big.mark = ","),
+          " to €", format(round(nmb_upper, 0), big.mark = ","), "]\n", sep = "")
+      cat("  → INTERPRETATION: Strong evidence that bevacizumab IS cost-effective\n")
+      cat("     at the €", format(wtp, big.mark = ","), " WTP threshold.\n", sep = "")
+      cat("     We are 95% confident that health benefits (valued at WTP) exceed costs.\n")
+      cat("     Bevacizumab SHOULD be adopted at this threshold.\n\n")
+
+    # CASE 3: 95% CrI spans zero (uncertain cost-effectiveness)
+    # ----------------------------------------------------------
+    # Lower bound is negative, upper bound is positive
+    # → Cannot rule out either positive or negative NMB
+    # → Uncertain whether intervention is cost-effective
+    #
+    # Health economic interpretation: Decision uncertainty is high
+    # May warrant value of information analysis to determine if further
+    # research could reduce uncertainty and improve decision-making
+    } else {
+      # Determine if mean is positive or negative
+      nmb_direction <- ifelse(nmb_mean > 0, "POSITIVE", "NEGATIVE")
+
+      cat("  → Mean NMB is €", format(round(nmb_mean, 0), big.mark = ","), " (", nmb_direction, ")\n", sep = "")
+      cat("  → 95% CrI spans zero: [€", format(round(nmb_lower, 0), big.mark = ","),
+          " to €", format(round(nmb_upper, 0), big.mark = ","), "]\n", sep = "")
+      cat("  → INTERPRETATION: UNCERTAIN cost-effectiveness at the €",
+          format(wtp, big.mark = ","), " WTP threshold.\n", sep = "")
+      cat("     The mean NMB is ", nmb_direction, ", but the credible interval includes both\n", sep = "")
+      cat("     positive and negative values, indicating substantial decision uncertainty.\n")
+      cat("     Additional research may be warranted to reduce uncertainty.\n")
+      cat("     Consider value of information analysis.\n\n")
+    }
+  }
+
+  # INTERPRETATION 2: Consistency across countries
+  # -----------------------------------------------
+  cat("\n2. CONSISTENCY ACROSS COUNTRIES:\n")
+  cat("----------------------------------\n\n")
+
+  # Count how many countries have negative mean NMB
+  # ------------------------------------------------
+  # sum() counts TRUE values
+  # psa_consolidated$Incremental_NMB_Mean < 0 creates logical vector
+  n_negative <- sum(psa_consolidated$Incremental_NMB_Mean < 0)
+  n_total <- nrow(psa_consolidated)
+
+  # Interpret consistency
+  # ---------------------
+  if (n_negative == n_total) {
+    # All countries have negative NMB
+    cat("All", n_total, "countries show NEGATIVE mean NMB.\n")
+    cat("→ Cost-effectiveness conclusion is CONSISTENT across countries.\n")
+    cat("→ Bevacizumab does NOT appear cost-effective in any of the analyzed settings,\n")
+    cat("  despite differences in costs, WTP thresholds, and healthcare systems.\n\n")
+
+  } else if (n_negative == 0) {
+    # All countries have positive NMB
+    cat("All", n_total, "countries show POSITIVE mean NMB.\n")
+    cat("→ Cost-effectiveness conclusion is CONSISTENT across countries.\n")
+    cat("→ Bevacizumab appears cost-effective in all analyzed settings,\n")
+    cat("  despite differences in costs, WTP thresholds, and healthcare systems.\n\n")
+
+  } else {
+    # Mixed results across countries
+    cat(n_negative, "out of", n_total, "countries show NEGATIVE mean NMB.\n")
+    cat("→ Cost-effectiveness conclusions DIFFER across countries.\n")
+    cat("→ Country-specific factors (costs, WTP threshold, healthcare system)\n")
+    cat("  substantially affect cost-effectiveness.\n")
+    cat("→ Decision-making should be country-specific rather than assuming\n")
+    cat("  results transfer directly across settings.\n\n")
+  }
+
+  # INTERPRETATION 3: Parameter uncertainty
+  # ----------------------------------------
+  cat("\n3. PARAMETER UNCERTAINTY (WIDTH OF CREDIBLE INTERVALS):\n")
+  cat("---------------------------------------------------------\n\n")
+
+  # Calculate CrI width for NMB for each country
+  # ---------------------------------------------
+  # Width = Upper bound - Lower bound
+  # Wider intervals → more uncertainty
+  # Narrower intervals → more precise estimates
+  for (i in 1:nrow(psa_consolidated)) {
+    country <- psa_consolidated$Country[i]
+    nmb_lower <- psa_consolidated$Incremental_NMB_Lower_CrI[i]
+    nmb_upper <- psa_consolidated$Incremental_NMB_Upper_CrI[i]
+    nmb_width <- nmb_upper - nmb_lower
+
+    cat(country, ":\n", sep = "")
+    cat("  95% CrI width for NMB: €", format(round(nmb_width, 0), big.mark = ","), "\n", sep = "")
+
+    # Interpret width
+    # ---------------
+    # These thresholds are somewhat arbitrary but provide guidance
+    if (nmb_width < 10000) {
+      cat("  → Relatively NARROW credible interval (low uncertainty)\n")
+      cat("     We have reasonably precise estimates of cost-effectiveness.\n\n")
+    } else if (nmb_width < 20000) {
+      cat("  → MODERATE credible interval width (moderate uncertainty)\n")
+      cat("     Parameter uncertainty has a noticeable impact on results.\n\n")
+    } else {
+      cat("  → WIDE credible interval (high uncertainty)\n")
+      cat("     Substantial parameter uncertainty affects cost-effectiveness estimates.\n")
+      cat("     Results should be interpreted with caution.\n\n")
+    }
+  }
+
+  # INTERPRETATION 4: Impact of WTP threshold
+  # ------------------------------------------
+  cat("\n4. IMPACT OF WILLINGNESS-TO-PAY THRESHOLD:\n")
+  cat("--------------------------------------------\n\n")
+
+  # Show how WTP thresholds differ across countries
+  # ------------------------------------------------
+  if (n_total > 1) {
+    # Find country with lowest and highest WTP
+    min_wtp_idx <- which.min(psa_consolidated$WTP_Threshold)
+    max_wtp_idx <- which.max(psa_consolidated$WTP_Threshold)
+
+    min_wtp_country <- psa_consolidated$Country[min_wtp_idx]
+    min_wtp_value <- psa_consolidated$WTP_Threshold[min_wtp_idx]
+    min_wtp_nmb <- psa_consolidated$Incremental_NMB_Mean[min_wtp_idx]
+
+    max_wtp_country <- psa_consolidated$Country[max_wtp_idx]
+    max_wtp_value <- psa_consolidated$WTP_Threshold[max_wtp_idx]
+    max_wtp_nmb <- psa_consolidated$Incremental_NMB_Mean[max_wtp_idx]
+
+    cat("WTP threshold ranges from €", format(min_wtp_value, big.mark = ","),
+        " (", min_wtp_country, ")\n", sep = "")
+    cat("                        to €", format(max_wtp_value, big.mark = ","),
+        " (", max_wtp_country, ")\n\n", sep = "")
+
+    cat("At LOWER WTP threshold (€", format(min_wtp_value, big.mark = ","), "):\n", sep = "")
+    cat("  Mean NMB = €", format(round(min_wtp_nmb, 0), big.mark = ","), "\n\n", sep = "")
+
+    cat("At HIGHER WTP threshold (€", format(max_wtp_value, big.mark = ","), "):\n", sep = "")
+    cat("  Mean NMB = €", format(round(max_wtp_nmb, 0), big.mark = ","), "\n\n", sep = "")
+
+    # Interpret WTP sensitivity
+    # --------------------------
+    # Higher WTP should lead to more positive (or less negative) NMB
+    # because we're valuing health benefits more highly
+    if (max_wtp_nmb > min_wtp_nmb) {
+      cat("→ As expected, NMB is more favorable at higher WTP thresholds.\n")
+      cat("  This is because we value health benefits (QALYs) more highly.\n")
+
+      # Check if threshold changes decision
+      if (min_wtp_nmb < 0 && max_wtp_nmb > 0) {
+        cat("  IMPORTANT: The WTP threshold CHANGES THE DECISION.\n")
+        cat("  Bevacizumab is NOT cost-effective at lower WTP but IS cost-effective at higher WTP.\n")
+        cat("  Decision-making depends critically on societal WTP threshold.\n\n")
+      } else {
+        cat("  However, the WTP threshold does NOT change the overall decision\n")
+        cat("  (both thresholds lead to the same conclusion about cost-effectiveness).\n\n")
+      }
+    }
+  } else {
+    cat("Only one country analyzed - cannot assess WTP threshold sensitivity across countries.\n\n")
+  }
+
+  cat("=======================================================\n\n")
+
+} else {
+  cat("\n(No interpretation provided - PSA data not yet available)\n\n")
+}
+
+# ============================================================================
+# SECTION COMPLETE: CONSOLIDATED PSA REPORTING
+# ============================================================================
+#
+# SUMMARY OF WHAT THIS SECTION ACCOMPLISHED:
+# -----------------------------------------------------------------------------
+# 1. ✓ Checked for available country PSA summary files
+# 2. ✓ Loaded all available country results
+# 3. ✓ Combined into consolidated table (raw and formatted versions)
+# 4. ✓ Displayed results in console with full documentation
+# 5. ✓ Saved consolidated tables to CSV files
+# 6. ✓ Provided plain-language interpretation of findings
+#
+# FILES CREATED (in output/ directory):
+# -----------------------------------------------------------------------------
+# - PSA_Summary_NMB_All_Countries.csv
+#   * Raw data with full numerical precision
+#   * All countries combined in one table
+#   * Suitable for further analysis
+#
+# - PSA_Summary_NMB_All_Countries_Formatted.csv
+#   * Publication-ready formatted version
+#   * Currency symbols, thousand separators, appropriate rounding
+#   * Ready to copy into manuscript Table 2
+#
+# NEXT STEPS FOR MANUSCRIPT:
+# -----------------------------------------------------------------------------
+# The consolidated formatted table can be directly used for:
+# - Table 2 in the main manuscript (PSA-based cost-effectiveness results)
+# - Supplementary tables showing country-specific results
+# - Discussion of cross-country transferability
+# - Justification of decision uncertainty and need for further research
+#
+# ALIGNMENT WITH REVIEWER 2 REQUEST:
+# -----------------------------------------------------------------------------
+# This section addresses Reviewer 2's request to:
+# ✓ Treat PSA as the effective base-case for decision-making
+# ✓ Report net monetary benefit (NMB) as the primary outcome
+# ✓ Provide credible intervals (95% CrI) for all incremental outcomes
+# ✓ Create tables suitable for updated Table 2 in the manuscript
+# ✓ Provide clear interpretation of cost-effectiveness conclusions
+#
+# The existing PSA (10,000 replications with appropriate distributions)
+# is already methodologically sound and meets best practice standards.
+# This consolidation section simply brings the results together for
+# clear reporting and interpretation.
+
+```
+
+```{r}
+
 #09.2 Create PSA object for dampack
 
 # Dampack has a number of functions to summarise and visualise the results of a probabilistic sensitivity analysis. However, the data needs to be in a specific structure before we can use those functions. 
