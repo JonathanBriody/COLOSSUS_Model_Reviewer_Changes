@@ -103,4 +103,4 @@ doc <- read_docx() %>%
   body_add_par("Table 1 Model Parameters Values: Baseline, Ranges and Distributions for Sensitivity Analysis", style = "heading 1") %>%
   body_add_flextable(ft)
 
-print(doc, target = paste0("Table_1_", country_name, ".docx"))
+print(doc, target = file.path("output", paste0("Table_1_", country_name, ".docx")))
