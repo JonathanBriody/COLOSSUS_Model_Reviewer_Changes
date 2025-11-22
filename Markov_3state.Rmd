@@ -4961,21 +4961,20 @@ tornado_plot_top10 <- owsa_tornado(
 # Health economic value: Industry-standard, publication-quality graphics
 library(ggplot2)
 
-# Add a clear axis label for the ICER
+# Add clear axis labels
 # In owsa_tornado's horizontal layout:
 # - Parameters are on the y-axis (vertical, on the left)
 # - ICER values are on the x-axis (horizontal, at the bottom)
-# Therefore we use labs(x = ...) to label the ICER axis
-# Health economic interpretation: Making the outcome variable explicit
-# Including units (€ per QALY) is critical for interpretation
+# Therefore we use labs(x = ...) to label the outcome axis and labs(y = ...) for parameters
+# Health economic interpretation: Making the outcome variable and parameters explicit
 tornado_plot_top10 <- tornado_plot_top10 +
 
   # The labs function adds or modifies labels
-  # x = sets the x-axis label (this is the ICER axis in horizontal tornado plots)
-  # We include units (€ per QALY) for clarity
-  # Health economic best practice: Always include units in axis labels
-  # Modeling interpretation: Labeling the horizontal axis
-  labs(x = "ICER (€ per QALY)")
+  # x = sets the x-axis label (this is the outcome/ICER axis in horizontal tornado plots)
+  # y = sets the y-axis label (this is the parameter axis)
+  # Health economic best practice: Clear, simple labels
+  # Modeling interpretation: Labeling both axes
+  labs(x = "Outcome", y = "Parameter")
 
 # Create a descriptive title that includes:
 # 1. What it is: "Tornado Plot"
@@ -5321,9 +5320,9 @@ unlimited_tornado_plot_top10 <- owsa_tornado(
 # This allows fair comparison between the two versions
 # Health economic interpretation: Consistent labeling for comparability
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
-  # Label the x-axis as ICER with units
+  # Label both axes
   # Identical to the limited version
-  labs(x = "ICER (€ per QALY)")
+  labs(x = "Outcome", y = "Parameter")
 
 # Create a title indicating this is the unlimited scale version
 # We add "Unlimited Scale" to the title to distinguish it from the limited version
