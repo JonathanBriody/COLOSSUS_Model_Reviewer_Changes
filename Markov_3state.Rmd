@@ -4377,65 +4377,458 @@ DSAICER
 # How I previously generated the tornado plot:
 # owsa_tornado(owsa = DSAICER, txtsize = 11)
 
-# First I generate the tornado plot using the owsa_tornado function
-tornado_plot <- owsa_tornado(owsa = DSAICER, txtsize = 11, ylim = c(100000, 400000))
+# ============================================================================
+# STEP 1: CREATE BASE TORNADO PLOT WITH AXIS LIMITS
+# ============================================================================
+#
+# HEALTH ECONOMIC PURPOSE:
+# -----------------------------------------------------------------------------
+# Generate a tornado plot showing how each parameter's uncertainty affects the
+# ICER (Incremental Cost-Effectiveness Ratio). The tornado plot is a standard
+# tool in health economic sensitivity analysis that visually displays which
+# parameters have the greatest influence on cost-effectiveness conclusions.
+#
+# WHAT IS A TORNADO PLOT?
+# -----------------------------------------------------------------------------
+# A tornado plot is a type of bar chart where:
+# - Each horizontal bar represents one parameter from the model
+# - The bar shows the range of ICER values as that parameter varies across
+#   its uncertainty range (typically ±20% or between min/max plausible values)
+# - Parameters are sorted by their impact on the outcome (most influential at top)
+# - The shape resembles a tornado, widest at the top and narrowing downward
+#
+# WHY USE AXIS LIMITS?
+# -----------------------------------------------------------------------------
+# Setting axis limits (ylim) serves two purposes:
+# 1. STANDARDIZATION: Allows comparison across countries by using consistent scales
+# 2. FOCUS: Zooms in on the decision-relevant range around key WTP thresholds
+#
+# However, limits can also:
+# - Hide important extreme values if set too narrow
+# - Create misleading impressions of parameter influence
+# Therefore, we create BOTH a limited and unlimited version for comparison
+#
+# MODELING APPROACH:
+# -----------------------------------------------------------------------------
+# Use dampack's owsa_tornado() function with the DSAICER one-way sensitivity
+# analysis results generated previously. Apply axis limits of €100,000-€400,000
+# to capture the typical decision space for Ireland, Germany, and Spain.
 
+# Generate the tornado plot using owsa_tornado function from dampack
+# -------------------------------------------------------------------
+# FUNCTION: owsa_tornado()
+#   - owsa: the one-way sensitivity analysis results (DSAICER object)
+#   - txtsize: base text size for labels (11pt is readable for publication)
+#   - ylim: axis limits in euros (€100,000 to €400,000)
+#
+# IMPORTANT: Despite the parameter name "ylim", this actually controls the
+# HORIZONTAL axis (ICER values) because tornado plots are rotated 90 degrees.
+# This is a quirk of the owsa_tornado() function implementation.
+#
+# Health economic interpretation: We're constraining the visualization to show
+# ICERs within the €100k-€400k range, which spans typical WTP thresholds for
+# the three countries analyzed (Ireland: €45k, Germany: €78.9k, Spain: €30k)
+tornado_plot <- owsa_tornado(
+  owsa = DSAICER,      # OWSA results containing all parameter variations
+  txtsize = 11,         # Text size for parameter labels
+  ylim = c(100000, 400000)  # ICER range to display (€100k to €400k)
+)
 
-# If I wanted to create the tornado plot with custom x-axis limits I could do this as below, per: https://rdrr.io/github/DARTH-git/dampack/man/owsa_tornado.html
+# NOTE: Alternative approach (commented out below)
+# If you wanted different limits, you could specify them as follows:
+# Reference: https://rdrr.io/github/DARTH-git/dampack/man/owsa_tornado.html
+#
 # tornado_plot <- owsa_tornado(
 #   owsa = DSAICER,
 #   txtsize = 11,
-#   ylim = c(0, 500000)  # Set the limits for the x-axis
+#   ylim = c(0, 500000)  # Wider range: €0 to €500,000
 # )
 
+# ============================================================================
+# STEP 2: FIX AXIS LABELS (SWAP ICER AND OUTCOME LABELS)
+# ============================================================================
+#
+# TECHNICAL CHALLENGE:
+# -----------------------------------------------------------------------------
+# The owsa_tornado() function creates a HORIZONTAL tornado plot (bars extend
+# left-right rather than up-down). Due to this 90-degree rotation:
+#
+# - What appears as the HORIZONTAL axis (showing ICER values) is technically
+#   the Y-AXIS in ggplot2's internal coordinate system
+# - What appears as the VERTICAL axis (showing parameter names) is technically
+#   the X-AXIS in ggplot2's internal coordinate system
+#
+# This means axis labels are SWAPPED from what you'd intuitively expect!
+#
+# SOLUTION:
+# -----------------------------------------------------------------------------
+# To set the label for the horizontal ICER axis (what viewers see as x-axis),
+# we must modify the Y-AXIS label in ggplot2's labs() function.
+#
+# HEALTH ECONOMIC VALUE:
+# -----------------------------------------------------------------------------
+# Proper axis labeling is critical for interpretation:
+# - "ICER" clearly indicates this is the incremental cost-effectiveness ratio
+# - Helps readers understand the outcome being analyzed
+# - Essential for publication quality figures
+#
+# IMPLEMENTATION:
+# -----------------------------------------------------------------------------
+# Use ggplot2's labs() function to modify axis labels
+# The + operator adds layers to the ggplot object (standard ggplot2 syntax)
 
-# Then I modify the x-axis label to "ICER" using the labs function from ggplot2, however, bevause the tornado plot generated by owsa_tornado has a horizontal orientation it means the labels are swapped, that is, to change the label on the x-axis correctly, we need to update the y-axis label instead:
+# Modify the axis label to display "ICER"
+# ----------------------------------------
+# IMPORTANT: We use labs(y = "ICER") NOT labs(x = "ICER") because the plot
+# is rotated. The visual horizontal axis is ggplot2's y-axis.
+#
+# labs() is ggplot2's function for modifying plot labels:
+#   - y: label for y-axis (which is visually the horizontal ICER axis here)
+#   - x: label for x-axis (which would be the vertical parameter axis)
+#
+# Health economic interpretation: Clearly labeling the outcome measure ensures
+# readers understand we're examining cost-effectiveness, not just costs or effects
 tornado_plot <- tornado_plot + labs(y = "ICER")
 
-# I adjust the alignment of the axis labels using the theme function in ggplot2. To center-align the y-axis label ("ICER"), you can specify the axis.title.y element in the theme function and set the vjust parameter to 0.5.
+# ============================================================================
+# STEP 3: CREATE DYNAMIC TITLE WITH COUNTRY NAME
+# ============================================================================
+#
+# HEALTH ECONOMIC PURPOSE:
+# -----------------------------------------------------------------------------
+# Each country analysis uses different:
+# - Treatment costs
+# - Healthcare system costs
+# - Willingness-to-pay thresholds
+# - Discount rates
+#
+# Therefore, the tornado plot results are COUNTRY-SPECIFIC. The title must
+# clearly indicate which country's analysis is shown to avoid confusion.
+#
+# IMPLEMENTATION:
+# -----------------------------------------------------------------------------
+# Use paste() to concatenate "Tornado Plot" with the country_name variable.
+# The country_name[1] extracts the first element in case country_name is a vector.
 
-# To add a dynamic title to the tornado plot that includes the country name, I use the ggtitle function from ggplot2. 
-
-# Add a title to the plot using the country name
+# Create descriptive title including country context
+# ---------------------------------------------------
+# paste() combines text strings:
+#   - "Tornado Plot": describes what type of visualization this is
+#   - country_name[1]: inserts the active country (e.g., "Ireland")
+#   - Result: "Tornado Plot Ireland"
+#
+# The [1] subscript ensures we extract only the first element of country_name.
+# This is defensive programming in case country_name is accidentally a vector.
+#
+# Health economic interpretation: Providing country context is essential because
+# cost-effectiveness is country-specific due to different costs and WTP thresholds
 plot_title <- paste("Tornado Plot", country_name[1])
 
-# I  center the title of the plot in ggplot2 by using the theme function to adjust the alignment. The plot.title element can be customized with the element_text function, where you can set the hjust parameter to 0.5 for center alignment.
-# So, the theme function is used to customize the plot.title element.
-# So, the element_text function with hjust = 0.5 centers the title horizontally.
+# ============================================================================
+# STEP 4: APPLY TITLE AND ADJUST ALIGNMENT
+# ============================================================================
+#
+# PROFESSIONAL FORMATTING REQUIREMENTS:
+# -----------------------------------------------------------------------------
+# Publication-quality figures require:
+# 1. CENTERED TITLE: Standard practice in academic journals
+# 2. ALIGNED AXIS LABELS: Proper vertical centering of axis text
+# 3. CONSISTENT THEME: Professional appearance across all figures
+#
+# GGPLOT2 THEME SYSTEM:
+# -----------------------------------------------------------------------------
+# ggplot2's theme() function controls all non-data plot elements:
+# - Text size, font, color
+# - Alignment and positioning
+# - Background colors
+# - Grid lines
+#
+# Two key elements we're adjusting:
+# - plot.title: the main title at the top of the plot
+# - axis.title.y: the y-axis label (which is visually the horizontal ICER axis)
+#
+# ALIGNMENT PARAMETERS:
+# -----------------------------------------------------------------------------
+# hjust (horizontal justification):
+#   - 0 = left-aligned
+#   - 0.5 = centered
+#   - 1 = right-aligned
+#
+# vjust (vertical justification):
+#   - 0 = bottom-aligned
+#   - 0.5 = centered
+#   - 1 = top-aligned
+#
+# For axis labels, vjust controls how far the label is from the axis line.
+# A value of 0.25 provides a small offset for readability.
 
-# To center-align the y-axis label with the title, :
+# Add title and apply professional formatting
+# --------------------------------------------
+# This single line of code performs three operations (chained with +):
+#
+# 1. ggtitle(plot_title): Adds the title we created above
+#
+# 2. theme(plot.title = element_text(hjust = 0.5)): Centers the title
+#    - plot.title: selects the title element
+#    - element_text(): function for modifying text properties
+#    - hjust = 0.5: centers the title horizontally
+#
+# 3. theme(axis.title.y = element_text(vjust = 0.25)): Adjusts y-axis label
+#    - axis.title.y: selects the y-axis label (visual horizontal axis for ICER)
+#    - vjust = 0.25: positions label with slight offset from axis
+#
+# Health economic value: Professional presentation enhances credibility and
+# ensures the analysis is taken seriously by decision-makers and peer reviewers
+tornado_plot <- tornado_plot +
+  ggtitle(plot_title) +
+  theme(
+    plot.title = element_text(hjust = 0.5),       # Center the title
+    axis.title.y = element_text(vjust = 0.25)     # Adjust y-axis label position
+  )
 
-# We can adjust the alignment of the axis labels using the theme function in ggplot2. To center-align the y-axis label ("ICER"), we can specify the axis.title.y element in the theme function and set the vjust parameter to 0.5.
-tornado_plot <- tornado_plot + ggtitle(plot_title) + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(vjust = 0.25))
+# NOTE: If we wanted perfect vertical centering of the axis label, we could
+# use vjust = 0.5 instead of 0.25. The 0.25 value provides a small offset
+# that often looks better visually by giving the label breathing room from
+# the axis tick labels.
 
-# By adjusting the vjust parameter for axis.title.y, the y-axis label "ICER" is vertically centered. If we also want to adjust the horizontal alignment of the y-axis label, we can use hjust similarly.
+# ============================================================================
+# STEP 5: SAVE HIGH-RESOLUTION TORNADO PLOT
+# ============================================================================
+#
+# PUBLICATION REQUIREMENTS:
+# -----------------------------------------------------------------------------
+# Academic journals typically require:
+# - High resolution: 300-600 DPI (dots per inch) minimum
+# - Specific dimensions: Often 8" width for full-page figures
+# - Common formats: PNG, TIFF, or EPS
+#
+# We use 600 DPI for maximum quality, suitable for:
+# - Print publication
+# - High-resolution displays
+# - Zooming without pixelation
+#
+# FILE NAMING CONVENTION:
+# -----------------------------------------------------------------------------
+# Format: Tornado_Diagram_<Country>.png
+# Examples:
+#   - Tornado_Diagram_Ireland.png
+#   - Tornado_Diagram_Germany.png
+#   - Tornado_Diagram_Spain.png
+#
+# This naming convention:
+# - Clearly describes the content ("Tornado_Diagram")
+# - Includes country context for organization
+# - Uses consistent format for easy batch processing
+#
+# IMPLEMENTATION:
+# -----------------------------------------------------------------------------
+# Use ggplot2's ggsave() function for high-quality output
 
-# I save the modified plot to a file as before, but now add "plot = tornado_plot":
-ggsave(paste("Tornado_Diagram_", country_name[1], ".png", sep = ""), plot = tornado_plot, width = 8, height = 4, dpi=600)
-# Close the graphics device
-while (!is.null(dev.list()))  dev.off()
-#png(paste("Tornado_Diagram_", country_name[1], ".png", sep = ""))
-#dev.off()
+# Save the tornado plot as a high-resolution PNG file
+# ----------------------------------------------------
+# ggsave() parameters:
+#   - filename: paste() constructs "Tornado_Diagram_<Country>.png"
+#   - plot: specify which ggplot object to save (tornado_plot)
+#   - width: 8 inches (standard full-page width)
+#   - height: 4 inches (appropriate for tornado plot aspect ratio)
+#   - dpi: 600 dots per inch (high resolution for publication)
+#
+# paste() with sep="" concatenates strings with no separator:
+#   - "Tornado_Diagram_"
+#   - country_name[1] (e.g., "Ireland")
+#   - ".png"
+#   - Result: "Tornado_Diagram_Ireland.png"
+#
+# Health economic value: High-resolution outputs ensure visual details
+# (parameter labels, axis values) are crisp and readable in publications
+ggsave(
+  paste("Tornado_Diagram_", country_name[1], ".png", sep = ""),
+  plot = tornado_plot,
+  width = 8,
+  height = 4,
+  dpi = 600  # High resolution for publication quality
+)
 
-# The [1] in country_name[1] is used to ensure that only the first element of the country_name vector is used, assuming country_name might be a vector with multiple entries. However, if country_name is a single-element character vector, you can directly use country_name without the [1].
+# Close all open graphics devices
+# --------------------------------
+# R can have multiple graphics devices open simultaneously. This while loop
+# ensures all devices are properly closed after saving, preventing:
+# - Memory leaks
+# - File locking issues
+# - Conflicts with subsequent plots
+#
+# dev.list() returns a list of open devices (NULL if none are open)
+# dev.off() closes the current device
+# The loop continues until dev.list() returns NULL
+while (!is.null(dev.list())) dev.off()
 
+# NOTE: Alternative approach (commented out below)
+# The older png() / dev.off() workflow is less flexible than ggsave():
+# png(paste("Tornado_Diagram_", country_name[1], ".png", sep = ""))
+# print(tornado_plot)  # Would need to explicitly print the plot
+# dev.off()
+#
+# ggsave() is preferred because it:
+# - Automatically detects file format from extension
+# - Handles sizing and resolution more intuitively
+# - Doesn't require explicit print() calls
 
-# Because I'm setting limits to put everything on the same range without actually knowing how these limits fit with the actual data, I create two versions of this plot, one with the limits applied, and one without the limits applied, so I can compare the two plots produced:
+# TECHNICAL NOTE:
+# -----------------------------------------------------------------------------
+# The [1] subscript in country_name[1] is defensive programming that ensures
+# we extract only the first element of the country_name vector. This prevents
+# errors if country_name is accidentally defined as a multi-element vector.
+#
+# If country_name is guaranteed to be a single string, the [1] is not strictly
+# necessary, but it's a good practice for robust code.
 
-unlimited_tornado_plot <- owsa_tornado(owsa = DSAICER, txtsize = 11)
+# ============================================================================
+# STEP 6: CREATE UNLIMITED VERSION FOR COMPARISON
+# ============================================================================
+#
+# HEALTH ECONOMIC RATIONALE:
+# -----------------------------------------------------------------------------
+# As mentioned earlier, setting axis limits can:
+# - BENEFIT: Standardize comparisons and focus on decision-relevant ranges
+# - RISK: Hide extreme parameter values or truncate important information
+#
+# BEST PRACTICE:
+# -----------------------------------------------------------------------------
+# Create TWO versions of the tornado plot:
+# 1. LIMITED version (above): Focused view with standardized axis (€100k-€400k)
+# 2. UNLIMITED version (below): Full view showing all data without truncation
+#
+# This allows analysts to:
+# - Compare the two versions to ensure limits aren't hiding critical information
+# - Use the limited version for cross-country comparisons (consistent scales)
+# - Use the unlimited version to see the full range of parameter influence
+#
+# HEALTH ECONOMIC VALUE:
+# -----------------------------------------------------------------------------
+# Transparency in sensitivity analysis is essential. Providing both versions
+# demonstrates that we're not hiding inconvenient results and allows reviewers
+# to verify that our chosen limits are appropriate.
 
+# Generate unlimited tornado plot (no axis limits)
+# -------------------------------------------------
+# DIFFERENCE FROM ABOVE: No ylim parameter
+# This allows the plot to automatically scale to fit all data points
+# The function will choose appropriate axis limits based on data range
+#
+# Health economic interpretation: This shows the TRUE range of parameter
+# influence without artificial constraints. Some parameters may have much
+# larger effects than visible in the limited version.
+unlimited_tornado_plot <- owsa_tornado(
+  owsa = DSAICER,      # Same OWSA results as before
+  txtsize = 11          # Same text size for consistency
+  # NO ylim parameter - let the plot scale automatically
+)
+
+# Apply the same axis label fix as before
+# ----------------------------------------
+# Must modify y-axis label to change the visual horizontal axis (due to rotation)
 unlimited_tornado_plot <- unlimited_tornado_plot + labs(y = "ICER")
 
+# Create identical title (without "unlimited" suffix for now)
+# ------------------------------------------------------------
+# We use the same title format for consistency. Some users prefer to add
+# "- Unlimited Scale" to the title to distinguish the versions, but here
+# we rely on the filename to differentiate them.
 plot_title <- paste("Tornado Plot", country_name[1])
 
-unlimited_tornado_plot <- unlimited_tornado_plot + ggtitle(plot_title) + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(vjust = 0.25))
+# Apply identical formatting (centered title, adjusted axis label)
+# -----------------------------------------------------------------
+# Use the same theme settings to ensure visual consistency between the two
+# versions. The only difference should be the axis limits, not the styling.
+unlimited_tornado_plot <- unlimited_tornado_plot +
+  ggtitle(plot_title) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.title.y = element_text(vjust = 0.25)
+  )
 
-ggsave(paste("Unlimited_Tornado_Diagram_", country_name[1], ".png", sep = ""), plot = unlimited_tornado_plot, width = 8, height = 4, dpi=600)
-while (!is.null(dev.list()))  dev.off()
+# Save the unlimited version with descriptive filename
+# -----------------------------------------------------
+# FILE NAMING: "Unlimited_Tornado_Diagram_<Country>.png"
+# The "Unlimited_" prefix clearly distinguishes this from the limited version
+#
+# IMPORTANT: Use identical dimensions and resolution (width=8, height=4, dpi=600)
+# to ensure fair comparison between limited and unlimited versions
+#
+# Health economic value: Consistent dimensions and resolution allow side-by-side
+# comparison of the two versions without visual bias from different sizes
+ggsave(
+  paste("Unlimited_Tornado_Diagram_", country_name[1], ".png", sep = ""),
+  plot = unlimited_tornado_plot,
+  width = 8,      # Same as limited version
+  height = 4,     # Same as limited version
+  dpi = 600       # Same high resolution
+)
 
-# The dpi argument in the ggsave function has been set to 600 to increase the resolution of the saved images. Higher values of dpi (dots per inch) result in higher resolution images.
-# This setting is applied to both the limited and unlimited versions of the tornado plot.
-# By adjusting the dpi setting, you ensure that the output images are of higher resolution, making them suitable for high-quality prints or detailed analysis.
+# Close all graphics devices
+# ---------------------------
+while (!is.null(dev.list())) dev.off()
+
+# ============================================================================
+# SUMMARY: HIGH-RESOLUTION OUTPUT SETTINGS
+# ============================================================================
+#
+# DPI (DOTS PER INCH) EXPLANATION:
+# -----------------------------------------------------------------------------
+# DPI controls image resolution and quality:
+#
+# - 72-96 DPI: Screen viewing (low quality, not suitable for print)
+# - 150-300 DPI: Basic print quality
+# - 600 DPI: High-quality print, professional publication standard
+#
+# We use 600 DPI because:
+# 1. JOURNAL REQUIREMENTS: Many journals require 300+ DPI for figures
+# 2. FUTURE-PROOFING: High-resolution originals can be downsampled if needed,
+#    but low-resolution images cannot be upsampled without quality loss
+# 3. DETAILED ANALYSIS: Allows zooming to read small parameter labels clearly
+# 4. PROFESSIONALISM: Demonstrates attention to quality and detail
+#
+# FILE SIZE IMPLICATIONS:
+# -----------------------------------------------------------------------------
+# Higher DPI = larger file sizes:
+# - 72 DPI: ~50-100 KB
+# - 300 DPI: ~500 KB - 1 MB
+# - 600 DPI: ~2-4 MB
+#
+# For modern systems, the extra file size is negligible compared to the
+# benefit of having publication-quality outputs.
+#
+# CONSISTENCY ACROSS BOTH VERSIONS:
+# -----------------------------------------------------------------------------
+# Both the limited and unlimited tornado plots use:
+# - Width: 8 inches (standard page width)
+# - Height: 4 inches (appropriate for horizontal tornado plots)
+# - DPI: 600 (high resolution)
+#
+# This ensures fair comparison between the two versions.
+
+# ============================================================================
+# AT THIS POINT WE HAVE CREATED TWO TORNADO PLOT OUTPUTS:
+# ============================================================================
+#
+# 1. Tornado_Diagram_<Country>.png
+#    - Axis limits: €100,000 to €400,000
+#    - Purpose: Standardized view for cross-country comparison
+#    - Use case: Focus on decision-relevant ICER range
+#
+# 2. Unlimited_Tornado_Diagram_<Country>.png
+#    - Axis limits: Automatic (based on data)
+#    - Purpose: Full view of all parameter influences
+#    - Use case: Verify no important information is hidden by axis limits
+#
+# NEXT STEPS:
+# -----------------------------------------------------------------------------
+# After generating these plots, you should:
+# 1. Visually compare both versions to verify axis limits are appropriate
+# 2. Check that parameter labels are fully visible and not truncated
+# 3. Verify the most influential parameters match clinical expectations
+# 4. Consider whether any parameters show surprisingly large or small effects
+# 5. Use these plots to communicate sensitivity analysis results to stakeholders
 
 
 # Plotting the outcomes of the OWSA in a tornado plot
@@ -7364,183 +7757,690 @@ for(i_run in 1:n_runs){
 
 ```{r}
 
-#09.1.1 Calculate Incremental Outcomes and Net Monetary Benefit from PSA
-
-# THEORY:
-# -------
-# In a probabilistic sensitivity analysis (PSA), we run the model thousands of times,
-# each time sampling parameter values from their uncertainty distributions.
-# For each simulation (iteration), we obtain:
-#   - Cost_SoC: total discounted cost under standard of care
-#   - Cost_Exp: total discounted cost under experimental strategy (bevacizumab)
-#   - Effect_SoC: total discounted QALYs under standard of care
-#   - Effect_Exp: total discounted QALYs under experimental strategy
+# ============================================================================
+# SECTION 09.1.1: CALCULATE INCREMENTAL OUTCOMES AND NET MONETARY BENEFIT
+# ============================================================================
 #
-# From these simulated outcomes, we can calculate incremental (difference) values:
-#   - Incremental cost = Cost_Exp - Cost_SoC
-#   - Incremental QALY = Effect_Exp - Effect_SoC
+# HEALTH ECONOMIC PURPOSE:
+# -----------------------------------------------------------------------------
+# This section analyzes the results of the Probabilistic Sensitivity Analysis (PSA)
+# to quantify the uncertainty in cost-effectiveness under parameter uncertainty.
 #
-# Net Monetary Benefit (NMB) is a decision-analytic metric that converts health outcomes
-# into monetary terms using a willingness-to-pay (WTP) threshold. NMB is calculated as:
+# WHAT IS PROBABILISTIC SENSITIVITY ANALYSIS?
+# -----------------------------------------------------------------------------
+# PSA is the gold standard method for characterizing parameter uncertainty in health
+# economic models. Unlike deterministic sensitivity analysis (which varies one or two
+# parameters at a time), PSA varies ALL uncertain parameters SIMULTANEOUSLY by:
+#
+# 1. Defining probability distributions for each uncertain parameter
+#    (e.g., gamma for costs, beta for probabilities, lognormal for hazard ratios)
+#
+# 2. Running the model thousands of times (typically 1,000-10,000 iterations)
+#
+# 3. For each iteration, drawing one random sample from each parameter's distribution
+#
+# 4. Recording the resulting costs and QALYs for each strategy
+#
+# The output is a DISTRIBUTION of possible cost-effectiveness outcomes, reflecting
+# the joint uncertainty across all parameters.
+#
+# WHY IS PSA IMPORTANT?
+# -----------------------------------------------------------------------------
+# PSA is critical for health economic evaluation because:
+#
+# 1. DECISION UNCERTAINTY: Quantifies the probability that each strategy is optimal
+#    at a given willingness-to-pay threshold
+#
+# 2. EXPECTED VALUE OF INFORMATION: Enables calculation of the value of reducing
+#    uncertainty through additional research
+#
+# 3. GUIDELINE REQUIREMENTS: Required by NICE, CADTH, PBAC, and other HTA agencies
+#
+# 4. REALISTIC REPRESENTATION: Jointly varying parameters captures correlations and
+#    interactions that one-way sensitivity analysis misses
+#
+# WHAT IS NET MONETARY BENEFIT (NMB)?
+# -----------------------------------------------------------------------------
+# Net Monetary Benefit is a decision-analytic metric that converts health economic
+# outcomes into a single monetary value by valuing health gains at the societal
+# willingness-to-pay (WTP) threshold.
+#
+# FORMULA:
 #   NMB = (Incremental QALY × WTP threshold) - Incremental cost
 #
-# A positive NMB indicates the experimental strategy provides value for money at the
-# given WTP threshold. By computing NMB across all PSA simulations, we quantify the
-# uncertainty in cost-effectiveness under probabilistic assumptions.
+# INTERPRETATION:
+#   - Positive NMB: The experimental strategy provides value for money
+#                   (health benefits exceed additional costs when valued at WTP)
+#   - Negative NMB: The experimental strategy does not provide value for money
+#                   (additional costs exceed health benefits when valued at WTP)
+#   - NMB = 0: Indifferent (on the cost-effectiveness acceptability frontier)
 #
-# CREDIBLE INTERVALS:
-# -------------------
-# Since each PSA simulation represents one plausible outcome under parameter uncertainty,
-# the distribution of incremental costs, QALYs, and NMB across simulations reflects our
-# uncertainty about these outcomes. We summarize this uncertainty using:
-#   - Mean: the average (expected) value across all simulations
-#   - 95% Credible Interval (CrI): the 2.5th and 97.5th percentiles, which define
-#     the range containing 95% of the simulated values
+# ADVANTAGES OF NMB OVER ICER:
+#   1. Linear scale (ICER has discontinuities when strategies are dominated)
+#   2. Can be averaged across PSA simulations (ICER averaging can be misleading)
+#   3. Directly interpretable as monetary value (ICER is a ratio)
+#   4. Handles dominated and dominant strategies naturally
 #
-# The credible interval provides a probabilistic range for the true value given our
-# current parameter uncertainty and chosen distributions.
+# WHAT ARE CREDIBLE INTERVALS?
+# -----------------------------------------------------------------------------
+# In Bayesian statistics and PSA, we use CREDIBLE INTERVALS rather than confidence
+# intervals. A 95% credible interval (95% CrI) is defined as:
 #
-# IMPLEMENTATION:
-# ---------------
-# Below, we extract the PSA results stored in df_c (costs) and df_e (effects),
-# calculate incremental outcomes and NMB for each simulation, then compute summary
-# statistics (mean and 95% CrI) to report in our cost-effectiveness analysis.
+#   "The range containing 95% of the simulated values under parameter uncertainty"
+#
+# We calculate this using percentiles:
+#   - Lower bound: 2.5th percentile (only 2.5% of simulations are below this)
+#   - Upper bound: 97.5th percentile (only 2.5% of simulations are above this)
+#
+# INTERPRETATION:
+# Given our current parameter uncertainty and chosen distributions, there is a 95%
+# probability that the true value lies within this range.
+#
+# NOTE: This is subtly different from a frequentist confidence interval, which
+# refers to repeated sampling properties rather than probability statements about
+# the true value.
+#
+# PSA OUTPUT DATA STRUCTURES:
+# -----------------------------------------------------------------------------
+# The PSA generates two key data frames (created earlier in the analysis):
+#
+# df_c (costs):
+#   - Rows: PSA iterations (e.g., 10,000 simulations)
+#   - Columns: Strategies (SoC = standard of care, Exp = experimental)
+#   - Values: Total discounted lifetime costs for each strategy in each simulation
+#
+# df_e (effects):
+#   - Rows: PSA iterations (e.g., 10,000 simulations)
+#   - Columns: Strategies (SoC = standard of care, Exp = experimental)
+#   - Values: Total discounted lifetime QALYs for each strategy in each simulation
+#
+# Each row represents ONE simulation where all uncertain parameters were sampled
+# from their distributions and the model was run to completion.
+#
+# WHAT THIS SECTION DOES:
+# -----------------------------------------------------------------------------
+# This section performs the following steps:
+#
+# STEP 1: Identify strategy column names (SoC vs experimental)
+# STEP 2: Calculate incremental costs for each PSA simulation
+# STEP 3: Calculate incremental QALYs for each PSA simulation
+# STEP 4: Calculate incremental NMB for each PSA simulation
+# STEP 5: Compute summary statistics (mean and 95% CrI) for each outcome
+# STEP 6: Create formatted summary tables for reporting
+# STEP 7: Save results to CSV files for manuscript preparation
+#
+# ALIGNMENT WITH BEST PRACTICES:
+# -----------------------------------------------------------------------------
+# This approach is consistent with:
+# - DARTH group tutorials on PSA analysis
+# - dampack package PSA analysis workflow
+# - ISPOR-SMDM Good Research Practices for PSA
+# - NICE Decision Support Unit Technical Support Documents
 
-# Identify strategy column names from PSA results
-# ------------------------------------------------
-# The data frames df_c and df_e contain costs and QALYs for each PSA simulation.
-# We need to identify which columns correspond to SoC and the experimental strategy.
-# The column names may vary (e.g., "Exp" or "Bev"), so we check them dynamically.
+# ============================================================================
+# STEP 1: IDENTIFY STRATEGY COLUMN NAMES FROM PSA RESULTS
+# ============================================================================
+#
+# DATA STRUCTURE VERIFICATION:
+# -----------------------------------------------------------------------------
+# Before we can calculate incremental outcomes, we need to identify which columns
+# in our PSA results correspond to which strategies.
+#
+# The PSA data frames (df_c and df_e) contain columns for each strategy:
+# - "SoC": Standard of Care (comparator)
+# - Experimental strategy: May be named "Exp", "Bev", "Bevacizumab", etc.
+#
+# DEFENSIVE PROGRAMMING:
+# -----------------------------------------------------------------------------
+# We don't hard-code the experimental strategy name because:
+# 1. It may vary between analyses
+# 2. Users may rename strategies in the model
+# 3. This makes the code more robust and reusable
+#
+# Instead, we dynamically identify the column names and verify data integrity.
 
+# Extract column names from the PSA output data frames
+# -----------------------------------------------------
+# colnames() returns a character vector of column names
+# We check BOTH df_c (costs) and df_e (effects) to ensure consistency
+#
+# Health economic interpretation: Verifying that cost and effect data frames
+# have matching structure (same strategies) before proceeding
 strat_names_c <- colnames(df_c)
 strat_names_e <- colnames(df_e)
 
+# Display PSA results summary for verification
+# ---------------------------------------------
+# This console output helps verify that:
+# 1. The PSA completed successfully (number of simulations matches expected)
+# 2. Strategy names are correct and consistent between costs and effects
+# 3. Data frames have the expected structure
+#
+# cat() is used instead of print() for more readable formatted output
+# nrow(df_c) gives the number of PSA simulations (rows)
+# paste() with collapse = ", " creates comma-separated list of strategies
+#
+# Health economic value: Transparent reporting of PSA structure for validation
 cat("\nPSA Results Summary:\n")
+cat("======================\n")
 cat("Number of PSA simulations:", nrow(df_c), "\n")
 cat("Cost strategies:", paste(strat_names_c, collapse = ", "), "\n")
 cat("Effect strategies:", paste(strat_names_e, collapse = ", "), "\n\n")
 
-# Identify SoC and experimental strategy columns
-# We assume "SoC" is always one column, and the other is the experimental strategy
+# VALIDATION CHECK (implicit):
+# If cost and effect strategies don't match, subsequent code will fail,
+# alerting the user to a data integrity problem
+
+# Identify standard of care and experimental strategy columns
+# ------------------------------------------------------------
+# ASSUMPTION: One column is always named "SoC" (standard of care)
+# This is enforced by the PSA code earlier in the analysis
+#
+# setdiff() finds elements in strat_names_c that are NOT in the set {"SoC"}
+# This returns the experimental strategy column name(s)
+# [1] extracts the first element (we assume only one experimental strategy)
+#
+# Mathematical interpretation: setdiff(A, B) = {x ∈ A : x ∉ B}
+# Here: setdiff(strat_names_c, "SoC") = all strategies except SoC
+#
+# Health economic interpretation: Identifying the intervention being evaluated
 soc_col <- "SoC"
 exp_col <- setdiff(strat_names_c, "SoC")[1]  # The column that isn't "SoC"
 
-cat("Identified strategies:\n")
-cat("  Standard of Care:", soc_col, "\n")
-cat("  Experimental:", exp_col, "\n\n")
+# Display identified strategies for verification
+# -----------------------------------------------
+# This console output confirms that we've correctly identified:
+# - The comparator (standard of care)
+# - The intervention (experimental strategy)
+#
+# This is important for transparency: readers of the R console output can
+# verify that the correct comparison is being made
+#
+# Health economic value: Clear documentation of which strategies are being
+# compared (essential for interpreting cost-effectiveness results)
+cat("Identified strategies for incremental analysis:\n")
+cat("  Standard of Care (comparator):", soc_col, "\n")
+cat("  Experimental (intervention):", exp_col, "\n\n")
 
-# Extract costs and QALYs from PSA results
-# ------------------------------------------
-# df_c contains costs for each simulation (rows) and strategy (columns)
-# df_e contains QALYs for each simulation (rows) and strategy (columns)
-# Each row corresponds to one PSA iteration (simulation run)
+# QUALITY ASSURANCE:
+# If exp_col is NA or empty, this indicates a problem with the PSA data structure
+# The subsequent code will fail with an informative error message
 
-# Calculate incremental outcomes for each PSA simulation
-# -------------------------------------------------------
-# For each simulation, compute the difference between experimental and standard of care.
-# These vectors will have length equal to the number of PSA runs, with each element
-# representing one simulated incremental outcome.
+# ============================================================================
+# STEP 2: CALCULATE INCREMENTAL OUTCOMES FOR EACH PSA SIMULATION
+# ============================================================================
+#
+# INCREMENTAL ANALYSIS RATIONALE:
+# -----------------------------------------------------------------------------
+# In cost-effectiveness analysis, we're interested in the ADDITIONAL (incremental)
+# costs and effects of the new intervention compared to current practice.
+#
+# Incremental analysis answers the question:
+#   "What extra resources are required, and what extra health benefits are gained,
+#    by adopting the new intervention instead of continuing with standard care?"
+#
+# DATA EXTRACTION:
+# -----------------------------------------------------------------------------
+# df_c contains costs for each PSA simulation (rows) and strategy (columns)
+# df_e contains QALYs for each PSA simulation (rows) and strategy (columns)
+# Each row corresponds to one PSA iteration (one complete model run)
+#
+# For example, in a PSA with 10,000 simulations:
+#   - df_c has 10,000 rows × 2 columns (SoC and Exp)
+#   - df_e has 10,000 rows × 2 columns (SoC and Exp)
+#   - Row 1 = simulation 1 with one set of sampled parameters
+#   - Row 2 = simulation 2 with a different set of sampled parameters
+#   - ... and so on
 
-# Incremental cost = Cost under experimental strategy - Cost under standard of care
-# Positive values indicate the experimental strategy costs more
+# Calculate incremental costs for each PSA simulation
+# ----------------------------------------------------
+# FORMULA: Incremental Cost = Cost(Experimental) - Cost(Standard of Care)
+#
+# This is a VECTORIZED operation in R:
+# - df_c[, exp_col] extracts all rows of the experimental strategy cost column
+# - df_c[, soc_col] extracts all rows of the standard of care cost column
+# - The subtraction happens element-wise across all simulations simultaneously
+# - Result: a vector of length = number of PSA simulations
+#
+# INTERPRETATION:
+# - Positive values: Experimental strategy costs MORE than SoC (additional cost)
+# - Negative values: Experimental strategy costs LESS than SoC (cost saving)
+# - Zero: No cost difference
+#
+# EXPECTED RESULT FOR THIS ANALYSIS:
+# For bevacizumab in mCRC, we expect positive incremental costs because:
+# - Bevacizumab is an expensive biologic therapy
+# - It's added ON TOP OF standard chemotherapy (FOLFOX)
+# - Therefore, total treatment costs should increase
+#
+# Health economic interpretation: Quantifying the additional healthcare expenditure
+# required to provide the new intervention
 incremental_costs <- df_c[, exp_col] - df_c[, soc_col]
 
-# Incremental QALYs = QALYs under experimental strategy - QALYs under standard of care
-# Positive values indicate the experimental strategy produces more QALYs (health benefit)
+# Calculate incremental QALYs for each PSA simulation
+# ----------------------------------------------------
+# FORMULA: Incremental QALY = QALY(Experimental) - QALY(Standard of Care)
+#
+# This is a VECTORIZED operation (same structure as incremental costs above)
+#
+# INTERPRETATION:
+# - Positive values: Experimental strategy produces MORE QALYs (health gain)
+# - Negative values: Experimental strategy produces FEWER QALYs (health loss)
+# - Zero: No health difference
+#
+# EXPECTED RESULT FOR THIS ANALYSIS:
+# For bevacizumab in mCRC, we expect positive incremental QALYs because:
+# - Bevacizumab improves progression-free survival (delays cancer progression)
+# - Extended PFS means more time in better health states
+# - Even modest survival extensions translate to QALY gains
+#
+# Health economic interpretation: Quantifying the additional health benefit
+# (in quality-adjusted life years) gained from the new intervention
 incremental_qalys <- df_e[, exp_col] - df_e[, soc_col]
 
-# Calculate Net Monetary Benefit (NMB) for each PSA simulation
-# -------------------------------------------------------------
-# NMB converts the cost-effectiveness decision into monetary terms by valuing
-# QALYs at the willingness-to-pay threshold (n_wtp) for the current country.
+# ============================================================================
+# STEP 3: CALCULATE NET MONETARY BENEFIT (NMB) FOR EACH PSA SIMULATION
+# ============================================================================
 #
-# Formula: NMB = (Incremental QALY × WTP) - Incremental Cost
+# NET MONETARY BENEFIT EXPLAINED:
+# -----------------------------------------------------------------------------
+# Net Monetary Benefit (NMB) is a LINEAR transformation of the cost-effectiveness
+# decision that avoids the mathematical problems associated with ICER.
 #
-# Interpretation:
-#   - Positive NMB: experimental strategy is cost-effective (benefits exceed costs)
-#   - Negative NMB: experimental strategy is not cost-effective
-#   - NMB = 0: indifferent (benefits exactly equal costs at this WTP)
+# FORMULA:
+#   NMB = (Incremental QALY × WTP) - Incremental Cost
+#
+# WHERE:
+#   - Incremental QALY: health gain from the intervention (calculated above)
+#   - WTP: willingness-to-pay threshold (€/QALY) for the country
+#     * Ireland: €45,000/QALY
+#     * Germany: €78,871/QALY
+#     * Spain: €30,000/QALY
+#   - Incremental Cost: additional cost of the intervention (calculated above)
+#
+# INTERPRETATION:
+# -----------------------------------------------------------------------------
+# NMB represents the NET VALUE (in monetary terms) of adopting the intervention:
+#
+#   Positive NMB: Benefits (valued at WTP) > Costs
+#                 → The intervention provides value for money
+#                 → Should be adopted (if WTP is societally appropriate)
+#
+#   Negative NMB: Benefits (valued at WTP) < Costs
+#                 → The intervention does not provide value for money
+#                 → Should not be adopted (at this WTP threshold)
+#
+#   NMB = 0: Benefits exactly equal costs
+#            → Indifferent between intervention and standard care
+#            → On the cost-effectiveness acceptability frontier
+#
+# WHY USE NMB INSTEAD OF ICER?
+# -----------------------------------------------------------------------------
+# ICER (Incremental Cost-Effectiveness Ratio) has several technical problems:
+#
+# 1. DISCONTINUITIES: ICER is undefined or changes sign in quadrants where
+#    interventions are dominated or dominant
+#
+# 2. AVERAGING PROBLEMS: Mean ICER ≠ ICER of mean costs and effects
+#    This makes averaging across PSA simulations misleading
+#
+# 3. NON-LINEAR: ICER = ΔCost / ΔQALY is a ratio, making statistical analysis
+#    complex (e.g., confidence intervals are difficult to interpret)
+#
+# NMB solves all these problems:
+# - Linear in costs and effects (no discontinuities)
+# - Can be averaged across PSA simulations (mean NMB is meaningful)
+# - Normally distributed under PSA (facilitates statistical inference)
+# - Directly interpretable as monetary value
+#
+# MATHEMATICAL RELATIONSHIP TO ICER:
+# -----------------------------------------------------------------------------
+# NMB and ICER are mathematically related:
+#
+#   NMB > 0  ⟺  ICER < WTP threshold
+#   NMB < 0  ⟺  ICER > WTP threshold
+#   NMB = 0  ⟺  ICER = WTP threshold
+#
+# So NMB provides the SAME decision as ICER, but with better statistical properties
+#
+# WTP THRESHOLD SELECTION:
+# -----------------------------------------------------------------------------
+# The WTP threshold (n_wtp) represents society's willingness to pay for one
+# additional QALY. This is:
+# - Country-specific (set in the active country block)
+# - Policy-determined (based on HTA agency guidelines)
+# - Potentially controversial (no objectively "correct" value exists)
+#
+# For this analysis:
+# - Ireland: €45,000 (HIQA threshold)
+# - Germany: €78,871 (empirically derived from previous decisions)
+# - Spain: €30,000 (commonly referenced threshold)
 
+# Calculate NMB for each PSA simulation
+# --------------------------------------
+# This is a VECTORIZED operation on the incremental outcomes:
+#   1. incremental_qalys * n_wtp: Value health gains in monetary terms
+#   2. Subtract incremental_costs: Net out the additional costs
+#   3. Result: Net value in euros for each simulation
+#
+# EXAMPLE CALCULATION:
+# If in one simulation:
+#   - Incremental QALYs = 0.15 (3 month extension × 0.5 utility weight)
+#   - Incremental Cost = €12,000 (bevacizumab cost + administration)
+#   - WTP threshold = €45,000/QALY (Ireland)
+#
+# Then:
+#   NMB = (0.15 × €45,000) - €12,000
+#       = €6,750 - €12,000
+#       = -€5,250
+#
+# Interpretation: At €45,000/QALY, this simulation suggests the intervention
+# does NOT provide value for money (negative NMB)
+#
+# Health economic interpretation: Converting cost-effectiveness into a single
+# monetary metric that directly shows whether benefits exceed costs at the
+# societal WTP threshold
 incremental_nmb <- (incremental_qalys * n_wtp) - incremental_costs
 
-# Compute summary statistics: Mean and 95% Credible Intervals
-# ------------------------------------------------------------
-# For each outcome (cost, QALY, NMB), we calculate:
-#   - Mean: the expected (average) value across all PSA simulations
-#   - Lower bound of 95% CrI: 2.5th percentile (only 2.5% of simulations are below this)
-#   - Upper bound of 95% CrI: 97.5th percentile (only 2.5% of simulations are above this)
+# AT THIS POINT WE HAVE THREE VECTORS:
+# --------------------------------------
+# Each vector has length = number of PSA simulations (e.g., 10,000)
+# Each element represents one plausible outcome under parameter uncertainty
 #
-# Together, the 2.5th and 97.5th percentiles form a 95% credible interval,
-# which contains the central 95% of the simulated distribution.
+# incremental_costs: Distribution of possible additional costs
+# incremental_qalys: Distribution of possible health gains
+# incremental_nmb: Distribution of possible net monetary benefits
+#
+# These distributions form the basis for:
+# - Summary statistics (mean and credible intervals) - calculated next
+# - Cost-effectiveness planes (scatter plots of cost vs QALY)
+# - Cost-effectiveness acceptability curves (probability of cost-effectiveness)
+# - Expected value of perfect information (value of eliminating uncertainty)
 
-# Summary statistics for incremental costs
+# ============================================================================
+# STEP 4: COMPUTE SUMMARY STATISTICS (MEAN AND 95% CREDIBLE INTERVALS)
+# ============================================================================
+#
+# SUMMARIZING PSA DISTRIBUTIONS:
+# -----------------------------------------------------------------------------
+# The PSA produces DISTRIBUTIONS of outcomes (incremental costs, QALYs, NMB),
+# not single point estimates. We summarize these distributions using:
+#
+# 1. MEAN: The expected (average) value across all simulations
+#    - Represents the central tendency
+#    - Used for decision-making under expected value criteria
+#
+# 2. 95% CREDIBLE INTERVAL (CrI): The range containing 95% of simulated values
+#    - Quantifies uncertainty around the mean
+#    - Defined by 2.5th and 97.5th percentiles
+#    - Narrower intervals = less uncertainty
+#    - Wider intervals = more uncertainty
+#
+# CREDIBLE INTERVAL CALCULATION:
+# -----------------------------------------------------------------------------
+# We use the quantile() function to find percentiles of the distribution:
+#
+#   quantile(x, probs = 0.025): 2.5th percentile (lower bound of 95% CrI)
+#     → Only 2.5% of simulations produced values below this
+#
+#   quantile(x, probs = 0.975): 97.5th percentile (upper bound of 95% CrI)
+#     → Only 2.5% of simulations produced values above this
+#
+#   Together: The interval [2.5th, 97.5th] contains the central 95% of the distribution
+#
+# INTERPRETATION OF CREDIBLE INTERVALS:
+# -----------------------------------------------------------------------------
+# Given our current parameter uncertainty and chosen distributions, there is
+# a 95% probability that the true value lies within the credible interval.
+#
+# For example, if incremental cost has 95% CrI of [€10,000, €18,000]:
+#   → We're 95% confident the true additional cost is between €10k and €18k
+#   → There's a 2.5% chance it's below €10k (optimistic scenario)
+#   → There's a 2.5% chance it's above €18k (pessimistic scenario)
+#
+# WHY NOT STANDARD DEVIATION OR STANDARD ERROR?
+# -----------------------------------------------------------------------------
+# We report credible intervals rather than SD or SE because:
+# 1. Credible intervals are easier to interpret for non-statisticians
+# 2. They provide decision-relevant ranges (what outcomes are plausible?)
+# 3. They're robust to non-normal distributions (PSA outputs may be skewed)
+# 4. They align with HTA agency reporting requirements
+
+# Calculate summary statistics for incremental costs
+# ---------------------------------------------------
+# mean(): Arithmetic mean of all PSA simulation results
+# quantile(): Computes specified percentiles of the distribution
+#
+# Health economic interpretation: Expected additional cost and its 95% CrI
 inc_cost_mean <- mean(incremental_costs)
-inc_cost_lower <- quantile(incremental_costs, probs = 0.025)  # 2.5th percentile
-inc_cost_upper <- quantile(incremental_costs, probs = 0.975)  # 97.5th percentile
+inc_cost_lower <- quantile(incremental_costs, probs = 0.025)  # Lower 95% CrI bound
+inc_cost_upper <- quantile(incremental_costs, probs = 0.975)  # Upper 95% CrI bound
 
-# Summary statistics for incremental QALYs
+# Calculate summary statistics for incremental QALYs
+# ---------------------------------------------------
+# Same structure as incremental costs above
+#
+# Health economic interpretation: Expected health gain and its 95% CrI
 inc_qaly_mean <- mean(incremental_qalys)
-inc_qaly_lower <- quantile(incremental_qalys, probs = 0.025)
-inc_qaly_upper <- quantile(incremental_qalys, probs = 0.975)
+inc_qaly_lower <- quantile(incremental_qalys, probs = 0.025)  # Lower 95% CrI bound
+inc_qaly_upper <- quantile(incremental_qalys, probs = 0.975)  # Upper 95% CrI bound
 
-# Summary statistics for incremental NMB
+# Calculate summary statistics for incremental NMB
+# -------------------------------------------------
+# Same structure as above
+#
+# Health economic interpretation: Expected net monetary benefit and its 95% CrI
+# This is the KEY outcome for decision-making:
+#   - Positive mean NMB suggests the intervention may be cost-effective
+#   - If the entire 95% CrI is positive, we're very confident it's cost-effective
+#   - If the CrI spans zero, there's substantial decision uncertainty
 inc_nmb_mean <- mean(incremental_nmb)
-inc_nmb_lower <- quantile(incremental_nmb, probs = 0.025)
-inc_nmb_upper <- quantile(incremental_nmb, probs = 0.975)
+inc_nmb_lower <- quantile(incremental_nmb, probs = 0.025)  # Lower 95% CrI bound
+inc_nmb_upper <- quantile(incremental_nmb, probs = 0.975)  # Upper 95% CrI bound
 
-# Create a summary table for reporting
-# -------------------------------------
-# This table will contain one row with summary statistics for the current country.
-# The table format aligns with Table 2 in the manuscript, providing mean estimates
-# and 95% credible intervals for incremental costs, QALYs, and NMB.
+# INTERPRETATION EXAMPLES:
+# -----------------------------------------------------------------------------
+# Example 1: NMB with 95% CrI entirely above zero
+#   Mean NMB = €5,000, 95% CrI [€2,000, €8,000]
+#   → Strong evidence of cost-effectiveness (95% confident NMB > 0)
+#   → Low decision uncertainty
+#
+# Example 2: NMB with 95% CrI spanning zero
+#   Mean NMB = €500, 95% CrI [-€3,000, €4,000]
+#   → Weak evidence of cost-effectiveness (mean is positive but uncertain)
+#   → High decision uncertainty (could be positive or negative)
+#   → May warrant value of information analysis
+#
+# Example 3: NMB with 95% CrI entirely below zero
+#   Mean NMB = -€10,000, 95% CrI [-€15,000, -€5,000]
+#   → Strong evidence against cost-effectiveness (95% confident NMB < 0)
+#   → Intervention should not be adopted at this WTP threshold
 
+# ============================================================================
+# STEP 5: CREATE SUMMARY TABLE FOR REPORTING
+# ============================================================================
+#
+# TABLE PURPOSE:
+# -----------------------------------------------------------------------------
+# This table consolidates all PSA summary statistics into a single data frame
+# suitable for:
+# - Console display (immediate review of results)
+# - Export to CSV (for manuscript tables)
+# - Further analysis or plotting
+#
+# TABLE STRUCTURE:
+# -----------------------------------------------------------------------------
+# One row per country analysis with the following columns:
+#
+# 1. Country: Which country's parameters and WTP threshold were used
+# 2. WTP_Threshold: The willingness-to-pay threshold (€/QALY)
+# 3. Incremental_Cost_Mean: Expected additional cost
+# 4. Incremental_Cost_Lower_CrI: Lower bound of 95% CrI for cost
+# 5. Incremental_Cost_Upper_CrI: Upper bound of 95% CrI for cost
+# 6. Incremental_QALY_Mean: Expected health gain
+# 7. Incremental_QALY_Lower_CrI: Lower bound of 95% CrI for QALY
+# 8. Incremental_QALY_Upper_CrI: Upper bound of 95% CrI for QALY
+# 9. Incremental_NMB_Mean: Expected net monetary benefit
+# 10. Incremental_NMB_Lower_CrI: Lower bound of 95% CrI for NMB
+# 11. Incremental_NMB_Upper_CrI: Upper bound of 95% CrI for NMB
+#
+# ALIGNMENT WITH MANUSCRIPT:
+# -----------------------------------------------------------------------------
+# This table format corresponds to Table 2 in the manuscript, which reports
+# PSA-based cost-effectiveness results for each country.
+#
+# USAGE NOTES:
+# -----------------------------------------------------------------------------
+# - stringsAsFactors = FALSE: Ensures country_name stays as character, not factor
+# - Numeric columns preserve full precision (rounding applied during display/export)
+# - Column names use underscores for programmatic access (e.g., filtering, plotting)
+
+# Create data frame with PSA summary statistics
+# ----------------------------------------------
+# data.frame() constructs a table where each named argument becomes a column
+# All vector inputs must have the same length (here, length = 1 since we're
+# summarizing results for one country at a time)
+#
+# Health economic interpretation: Tabulating the expected outcomes and uncertainty
+# for cost-effectiveness decision-making
 psa_summary_table <- data.frame(
+
+  # Country and WTP context
+  # -----------------------
+  # Identifies which country's analysis this row represents
+  # Important when combining results across multiple countries
   Country = country_name,
+
+  # The WTP threshold used to calculate NMB
+  # Different countries have different thresholds reflecting different societal
+  # preferences or affordability constraints
   WTP_Threshold = n_wtp,
 
   # Incremental cost: mean and 95% CrI
+  # -----------------------------------
+  # Expected additional cost of the intervention
   Incremental_Cost_Mean = inc_cost_mean,
+
+  # Lower bound: optimistic cost scenario (only 2.5% of simulations are cheaper)
   Incremental_Cost_Lower_CrI = inc_cost_lower,
+
+  # Upper bound: pessimistic cost scenario (only 2.5% of simulations are costlier)
   Incremental_Cost_Upper_CrI = inc_cost_upper,
 
   # Incremental QALY: mean and 95% CrI
+  # -----------------------------------
+  # Expected health gain from the intervention
   Incremental_QALY_Mean = inc_qaly_mean,
+
+  # Lower bound: pessimistic health scenario (only 2.5% of simulations show less benefit)
   Incremental_QALY_Lower_CrI = inc_qaly_lower,
+
+  # Upper bound: optimistic health scenario (only 2.5% of simulations show more benefit)
   Incremental_QALY_Upper_CrI = inc_qaly_upper,
 
   # Incremental NMB: mean and 95% CrI
+  # ----------------------------------
+  # Expected net monetary benefit (KEY decision metric)
   Incremental_NMB_Mean = inc_nmb_mean,
+
+  # Lower bound: pessimistic value-for-money scenario
   Incremental_NMB_Lower_CrI = inc_nmb_lower,
+
+  # Upper bound: optimistic value-for-money scenario
   Incremental_NMB_Upper_CrI = inc_nmb_upper,
 
+  # Prevent automatic conversion of strings to factors
+  # This preserves country_name as character type for easier manipulation
   stringsAsFactors = FALSE
 )
 
-# Display the summary table
-# -------------------------
+# ============================================================================
+# STEP 6: DISPLAY SUMMARY RESULTS IN CONSOLE
+# ============================================================================
+#
+# CONSOLE OUTPUT PURPOSE:
+# -----------------------------------------------------------------------------
+# This formatted console output provides immediate feedback on PSA results:
+# - Allows quick verification that results are sensible
+# - Helps identify data issues (e.g., unexpected signs or magnitudes)
+# - Provides human-readable summary before creating formal tables/figures
+#
+# FORMATTING APPROACH:
+# -----------------------------------------------------------------------------
+# We use cat() rather than print() to create custom-formatted output:
+# - cat() allows precise control over line breaks and spacing
+# - format() with big.mark = "," adds thousand separators (e.g., €10,000)
+# - round() controls decimal precision (2 decimals for costs, 4 for QALYs)
+#
+# PRESENTATION STRUCTURE:
+# -----------------------------------------------------------------------------
+# Header: Identifies the analysis type and country
+# Context: Shows WTP threshold and number of simulations
+# Results: Displays mean and 95% CrI for each outcome
+# Interpretation: Provides decision-relevant note based on NMB sign
+
+# Display formatted PSA summary to console
+# -----------------------------------------
+# Horizontal rules (=======) visually separate the summary from other output
+# This makes it easier to find results when scrolling through R console output
 cat("\n=======================================================\n")
 cat("PSA SUMMARY: Incremental Outcomes and Net Monetary Benefit\n")
 cat("=======================================================\n\n")
+
+# Display analysis context
+# -------------------------
+# country_name: Which country's parameters were used
+# n_wtp: The WTP threshold for this country (determines NMB calculation)
+# nrow(df_c): Number of PSA simulations (should match n_runs parameter)
 cat("Country:", country_name, "\n")
 cat("Willingness-to-pay threshold: €", format(n_wtp, big.mark = ","), "\n")
 cat("Number of PSA simulations:", nrow(df_c), "\n\n")
 
+# Display incremental cost results
+# ---------------------------------
+# round(, 2): Show costs to 2 decimal places (cent precision)
+# format(, big.mark = ","): Add thousand separators for readability
+# paste() with exp_col and soc_col: Show which comparison is being made
+#
+# Health economic interpretation: Expected additional cost and its uncertainty
 cat("INCREMENTAL COST (", exp_col, " vs ", soc_col, "):\n", sep = "")
 cat("  Mean: €", format(round(inc_cost_mean, 2), big.mark = ","), "\n")
 cat("  95% CrI: €", format(round(inc_cost_lower, 2), big.mark = ","),
     " to €", format(round(inc_cost_upper, 2), big.mark = ","), "\n\n")
 
+# Display incremental QALY results
+# ---------------------------------
+# round(, 4): Show QALYs to 4 decimal places (standard precision)
+# No thousand separators needed for QALYs (values typically < 10)
+#
+# Health economic interpretation: Expected health gain and its uncertainty
 cat("INCREMENTAL QALY (", exp_col, " vs ", soc_col, "):\n", sep = "")
 cat("  Mean:", round(inc_qaly_mean, 4), "\n")
 cat("  95% CrI:", round(inc_qaly_lower, 4), "to", round(inc_qaly_upper, 4), "\n\n")
 
+# Display incremental NMB results
+# --------------------------------
+# Same formatting as costs (2 decimal places, thousand separators)
+# NMB is the KEY outcome for interpreting cost-effectiveness
+#
+# Health economic interpretation: Expected net value of the intervention
 cat("INCREMENTAL NET MONETARY BENEFIT (", exp_col, " vs ", soc_col, "):\n", sep = "")
 cat("  Mean: €", format(round(inc_nmb_mean, 2), big.mark = ","), "\n")
 cat("  95% CrI: €", format(round(inc_nmb_lower, 2), big.mark = ","),
     " to €", format(round(inc_nmb_upper, 2), big.mark = ","), "\n")
 cat("=======================================================\n\n")
 
-# Interpretation note for NMB
+# Add interpretation note based on NMB sign
+# ------------------------------------------
+# DECISION RULE: Positive mean NMB suggests cost-effectiveness
+#
+# IMPORTANT CAVEAT: We say "may be" rather than "is" because:
+# 1. This is based on expected values (mean), not the full distribution
+# 2. Decision uncertainty exists if the 95% CrI spans zero
+# 3. Cost-effectiveness depends on societal acceptance of the WTP threshold
+#
+# Health economic value: Translates statistical results into decision-relevant
+# interpretation for stakeholders who may not be familiar with NMB
 if (inc_nmb_mean > 0) {
   cat("NOTE: Positive mean NMB suggests the experimental strategy (", exp_col, ")\n", sep = "")
   cat("      may be cost-effective at the €", format(n_wtp, big.mark = ","), " WTP threshold.\n\n")
@@ -7550,57 +8450,257 @@ if (inc_nmb_mean > 0) {
 }
 
 # Display the summary table in data frame format
+# -----------------------------------------------
+# print() shows the data frame in standard R tabular format
+# This complements the cat() output above by showing all columns in one view
+#
+# Health economic value: Provides structured data format that can be
+# copy-pasted into Excel or other tools for further analysis
 print(psa_summary_table)
 
+# ============================================================================
+# STEP 7: SAVE RESULTS TO CSV FILES FOR MANUSCRIPT PREPARATION
+# ============================================================================
+#
+# FILE OUTPUT PURPOSE:
+# -----------------------------------------------------------------------------
+# We save PSA summary results to CSV files for several reasons:
+#
+# 1. REPRODUCIBILITY: Permanent record of PSA results for each country
+# 2. MANUSCRIPT PREPARATION: Can be imported into Word/LaTeX for Table 2
+# 3. FURTHER ANALYSIS: Can be loaded into Excel, R, or other tools
+# 4. VERSION CONTROL: Git can track changes to CSV files between analyses
+# 5. STAKEHOLDER SHARING: Easy-to-share format for non-R users
+#
+# FILE ORGANIZATION:
+# -----------------------------------------------------------------------------
+# We use an "outputs/" subdirectory to:
+# - Keep analysis outputs separate from code and input data
+# - Make it easy to find all generated files
+# - Allow adding outputs/ to .gitignore if desired (to avoid tracking large files)
+#
+# FILE NAMING CONVENTION:
+# -----------------------------------------------------------------------------
+# Format: PSA_Summary_NMB_<Country>.csv
+# Examples:
+#   - PSA_Summary_NMB_Ireland.csv
+#   - PSA_Summary_NMB_Germany.csv
+#   - PSA_Summary_NMB_Spain.csv
+#
+# This naming convention:
+# - Clearly describes the content ("PSA_Summary_NMB")
+# - Includes country context for organization
+# - Uses consistent format for programmatic access
+
 # Create outputs directory if it doesn't exist
-# ---------------------------------------------
+# ----------------------------------------------
+# dir.exists(): Checks if the "outputs" directory exists
+# dir.create(): Creates the directory if it doesn't exist
+#   - recursive = TRUE: Creates parent directories if needed
+#   - This is safe to run even if the directory already exists
+#
+# This ensures the directory exists before we try to save files to it,
+# preventing "path not found" errors
+#
+# Health economic value: Organized file structure facilitates reproducibility
 if (!dir.exists("outputs")) {
   dir.create("outputs", recursive = TRUE)
   cat("\nCreated 'outputs/' directory for saving results.\n")
 }
 
-# Save the summary table to CSV for manuscript preparation
-# --------------------------------------------------------
-# This CSV file can be used directly or reformatted for Table 2 in the manuscript.
-# The file name includes the country name for easy identification when running
-# the analysis for different countries.
-
+# Save the raw summary table to CSV
+# ----------------------------------
+# RAW TABLE FORMAT:
+# This version contains numeric values without formatting:
+# - Full precision for all numbers (no rounding artifacts)
+# - Suitable for further statistical analysis
+# - Can be imported into R and used for calculations
+#
+# file.path(): Constructs platform-independent file paths
+#   - On Windows: "outputs\\PSA_Summary_NMB_Ireland.csv"
+#   - On Mac/Linux: "outputs/PSA_Summary_NMB_Ireland.csv"
+#
+# paste0(): Concatenates strings without separator (same as paste with sep="")
+#
+# write.csv() parameters:
+#   - file: where to save the file
+#   - row.names = FALSE: Don't include row numbers (1, 2, 3...) in the CSV
+#     This makes the CSV cleaner and easier to read
+#
+# Health economic value: Preserves full numerical precision for transparency
+# and reproducibility of cost-effectiveness calculations
 output_filename <- file.path("outputs", paste0("PSA_Summary_NMB_", country_name, ".csv"))
 write.csv(psa_summary_table, file = output_filename, row.names = FALSE)
 
+# Confirm successful save
+# -----------------------
+# Provides feedback to the user that the file was created
+# Shows the exact file path for easy location
 cat("\nSummary table saved to:", output_filename, "\n\n")
 
-# Optional: Create a formatted version for display
-# ------------------------------------------------
-# This creates a more readable version with proper formatting for costs and QALYs
+# ============================================================================
+# STEP 8: CREATE AND SAVE FORMATTED VERSION FOR MANUSCRIPT
+# ============================================================================
+#
+# FORMATTED TABLE PURPOSE:
+# -----------------------------------------------------------------------------
+# While the raw table (above) preserves numerical precision, it's not ideal
+# for direct inclusion in manuscripts because:
+# - Numbers appear with many decimal places (not publication-ready)
+# - No currency symbols or thousand separators
+# - Mean and CrI are in separate columns (takes up more space)
+#
+# This formatted version addresses these issues by:
+# - Combining mean and CrI into single columns (e.g., "€12,500 (€10,000 to €15,000)")
+# - Adding currency symbols and thousand separators
+# - Applying appropriate rounding (2 decimals for costs, 4 for QALYs)
+# - Using human-readable column names with spaces
+#
+# TRADE-OFF:
+# -----------------------------------------------------------------------------
+# The formatted version is BETTER for presentation but WORSE for analysis:
+# + Easy to read and copy into manuscript tables
+# + Matches journal formatting requirements
+# - Cannot perform calculations on formatted text (e.g., "€12,500")
+# - Loses some precision due to rounding
+#
+# Therefore, we save BOTH versions:
+# - Raw version for analysis and transparency
+# - Formatted version for manuscript preparation
+#
+# TABLE STRUCTURE:
+# -----------------------------------------------------------------------------
+# Each metric (cost, QALY, NMB) is represented by TWO columns:
+# 1. Mean column: Shows the expected value with proper formatting
+# 2. 95% CrI column: Shows the uncertainty range in "X to Y" format
+#
+# This matches common health economics manuscript table formats
 
+# Create formatted summary table
+# -------------------------------
+# FORMATTING DECISIONS:
+#
+# For costs and NMB:
+#   - paste0("€", format(round(x, 2), big.mark = ","))
+#   - Adds € symbol
+#   - Rounds to 2 decimal places
+#   - Adds thousand separators (€12,345.67)
+#
+# For QALYs:
+#   - round(x, 4): Standard precision for QALYs (0.1234)
+#   - No currency symbol or separators needed
+#
+# For credible intervals:
+#   - Combine lower and upper bounds with " to "
+#   - Example: "€10,000 to €15,000"
+#   - Example: "0.1234 to 0.5678"
+#
+# Health economic value: Publication-ready table following field conventions
 psa_summary_formatted <- data.frame(
+
+  # Country and WTP threshold (formatted with currency symbol)
   Country = country_name,
   WTP = paste0("€", format(n_wtp, big.mark = ",")),
 
+  # Incremental cost: mean (formatted with € and separators)
   `Incremental Cost (Mean)` = paste0("€", format(round(inc_cost_mean, 2), big.mark = ",")),
-  `Incremental Cost (95% CrI)` = paste0("€", format(round(inc_cost_lower, 2), big.mark = ","),
-                                         " to €", format(round(inc_cost_upper, 2), big.mark = ",")),
 
+  # Incremental cost: 95% CrI (formatted as range)
+  # Example output: "€10,000.00 to €15,000.00"
+  `Incremental Cost (95% CrI)` = paste0(
+    "€", format(round(inc_cost_lower, 2), big.mark = ","),
+    " to €", format(round(inc_cost_upper, 2), big.mark = ",")
+  ),
+
+  # Incremental QALY: mean (rounded to 4 decimal places)
   `Incremental QALY (Mean)` = round(inc_qaly_mean, 4),
-  `Incremental QALY (95% CrI)` = paste0(round(inc_qaly_lower, 4), " to ", round(inc_qaly_upper, 4)),
 
+  # Incremental QALY: 95% CrI (formatted as range)
+  # Example output: "0.1234 to 0.5678"
+  `Incremental QALY (95% CrI)` = paste0(
+    round(inc_qaly_lower, 4), " to ", round(inc_qaly_upper, 4)
+  ),
+
+  # Incremental NMB: mean (formatted with € and separators)
   `Incremental NMB (Mean)` = paste0("€", format(round(inc_nmb_mean, 2), big.mark = ",")),
-  `Incremental NMB (95% CrI)` = paste0("€", format(round(inc_nmb_lower, 2), big.mark = ","),
-                                        " to €", format(round(inc_nmb_upper, 2), big.mark = ",")),
 
+  # Incremental NMB: 95% CrI (formatted as range)
+  # Example output: "€-5,000.00 to €2,500.00"
+  `Incremental NMB (95% CrI)` = paste0(
+    "€", format(round(inc_nmb_lower, 2), big.mark = ","),
+    " to €", format(round(inc_nmb_upper, 2), big.mark = ",")
+  ),
+
+  # check.names = FALSE: Preserve column names with spaces and parentheses
+  # Without this, R would convert "Incremental Cost (Mean)" to "Incremental.Cost..Mean."
   check.names = FALSE,
+
+  # stringsAsFactors = FALSE: Keep text as character strings, not factors
   stringsAsFactors = FALSE
 )
 
+# Display the formatted table to console
+# ---------------------------------------
+# This allows immediate review of how the table will appear in the manuscript
+# Check that formatting looks appropriate (currency symbols, decimal places, etc.)
 cat("\nFORMATTED SUMMARY TABLE (for manuscript):\n")
 print(psa_summary_formatted, row.names = FALSE)
 
-# Save formatted version as well
+# Save the formatted table to CSV
+# --------------------------------
+# FILE NAMING: PSA_Summary_NMB_Formatted_<Country>.csv
+# The "_Formatted" suffix distinguishes this from the raw version
+#
+# USAGE:
+# - Open in Excel to copy-paste into manuscript Word document
+# - Import into LaTeX using csvreader or similar packages
+# - Share with co-authors who don't use R
+#
+# IMPORTANT: When opening in Excel, ensure it doesn't corrupt the formatting:
+# - Use "Import Data" rather than double-clicking the CSV
+# - Specify that columns are "Text" to preserve number formatting
+#
+# Health economic value: Streamlines manuscript preparation and reduces
+# transcription errors by providing publication-ready formatted output
 formatted_filename <- file.path("outputs", paste0("PSA_Summary_NMB_Formatted_", country_name, ".csv"))
 write.csv(psa_summary_formatted, file = formatted_filename, row.names = FALSE)
 
+# Confirm successful save
+# -----------------------
 cat("\nFormatted summary table saved to:", formatted_filename, "\n\n")
+
+# ============================================================================
+# SECTION COMPLETE: NMB CALCULATION AND REPORTING
+# ============================================================================
+#
+# AT THIS POINT WE HAVE CREATED:
+# -----------------------------------------------------------------------------
+# 1. Three vectors of PSA outcomes (incremental costs, QALYs, NMB)
+# 2. Summary statistics (mean and 95% CrI) for each outcome
+# 3. Console output showing results in human-readable format
+# 4. Raw CSV file with full numerical precision
+# 5. Formatted CSV file ready for manuscript inclusion
+#
+# FILES CREATED (in outputs/ directory):
+# -----------------------------------------------------------------------------
+# - PSA_Summary_NMB_<Country>.csv: Raw data with full precision
+# - PSA_Summary_NMB_Formatted_<Country>.csv: Publication-ready formatted version
+#
+# NEXT STEPS IN THE ANALYSIS:
+# -----------------------------------------------------------------------------
+# The subsequent sections of the R Markdown file will use the PSA results to:
+# - Create cost-effectiveness planes (scatter plots)
+# - Generate cost-effectiveness acceptability curves (CEACs)
+# - Calculate expected value of perfect information (EVPI) - if included
+# - Create additional visualizations and summary tables
+#
+# TRANSPARENCY AND REPRODUCIBILITY:
+# -----------------------------------------------------------------------------
+# The heavily commented code in this section ensures that:
+# - Methods are transparent and can be peer-reviewed
+# - Results can be reproduced by running the code
+# - Future users can understand the health economic logic
+# - The analysis follows best practices (DARTH, dampack, ISPOR-SMDM guidelines)
 
 ```
 
