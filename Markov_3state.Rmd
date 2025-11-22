@@ -898,6 +898,81 @@ l_TTP_SoC_weibull$coefficients
 coef_weibull_shape_SoC <- l_TTP_SoC_weibull$coefficients["shape"]
 coef_weibull_scale_SoC <- l_TTP_SoC_weibull$coefficients["scale"]
 
+# ============================================================================
+# GAMMA DISTRIBUTION PARAMETERS FOR TTP (Time To Progression)
+# ============================================================================
+#
+# HEALTH ECONOMIC THEORY:
+# In health economic modelling, we often test the robustness of our results
+# to different parametric survival distribution choices. While Weibull is
+# commonly used due to its flexibility (monotonically increasing or decreasing
+# hazard), the gamma distribution offers additional flexibility with non-monotonic
+# hazards (can increase then decrease, or vice versa).
+#
+# STATISTICAL BACKGROUND - GAMMA DISTRIBUTION:
+# The gamma distribution for survival analysis is characterized by two parameters:
+#   - shape parameter (α): Controls the shape of the hazard function
+#   - rate parameter (β): Controls the scale (speed) of events
+# The scale parameter is 1/rate.
+#
+# FLEXSURV PARAMETERIZATION:
+# flexsurv fits gamma distributions and returns log(shape) and log(rate) as
+# coefficients. These need to be exponentiated before use in base R functions.
+#
+# SURVIVAL FUNCTION FOR GAMMA:
+# S(t) = 1 - F(t) where F is the gamma CDF
+# In R: S(t) = pgamma(t, shape, rate, lower.tail = FALSE)
+#
+# WHY EXTRACT THESE NOW:
+# Even though Weibull is our base case, we extract gamma parameters here so
+# they're available when we want to run the gamma scenario. This follows the
+# principle of "fit once, use many times" - we fit all candidate distributions
+# during the survival analysis phase, then can switch between them for scenarios.
+#
+# THEORETICAL BACKGROUND - WHY GAMMA FOR SURVIVAL?:
+# The gamma distribution is a two-parameter family with probability density:
+#   f(t) = (β^α / Γ(α)) * t^(α-1) * exp(-βt)
+# where α = shape, β = rate, Γ is the gamma function
+#
+# The hazard function for gamma is:
+#   h(t) = f(t) / S(t) = (β^α * t^(α-1) * exp(-βt)) / (Γ(α, βt) / Γ(α))
+# where Γ(α, βt) is the upper incomplete gamma function
+#
+# HAZARD BEHAVIOR:
+#   - If α < 1: hazard decreases over time (like Weibull with shape < 1)
+#   - If α = 1: constant hazard (exponential distribution)
+#   - If α > 1: hazard increases initially, but unlike Weibull, can plateau
+#                (non-monotonic behavior - this is the key advantage)
+#
+# CLINICAL RELEVANCE IN ONCOLOGY:
+# Cancer progression risk often follows complex patterns:
+#   - Early period: rapidly increasing risk as aggressive disease manifests
+#   - Later period: risk may stabilize in patients who remain progression-free
+# Gamma can model this "increase then plateau" pattern better than Weibull's
+# strictly monotonic (always increasing or always decreasing) hazard.
+#
+# Extract the gamma distribution coefficients from the fitted model object
+# Display the full coefficient vector for transparency and verification
+l_TTP_SoC_gamma$coefficients
+
+# Extract shape parameter (alpha) - controls the form of the hazard function
+# NOTE: flexsurv returns log(shape), so we store the log-transformed value
+# This will be exponentiated later when used in pgamma() function
+# Higher shape values (after exp) indicate hazard that increases more steeply
+coef_gamma_shape_SoC <- l_TTP_SoC_gamma$coefficients["shape"]
+
+# Extract rate parameter (beta) - controls how quickly events occur
+# NOTE: flexsurv returns log(rate), so we store the log-transformed value
+# This will be exponentiated later when used in pgamma() function
+# Higher rate values (after exp) indicate events happen more quickly
+# (i.e., shorter expected time to progression)
+coef_gamma_rate_SoC <- l_TTP_SoC_gamma$coefficients["rate"]
+
+# Display extracted parameters for verification and documentation
+# These are still on the log scale at this point
+coef_gamma_shape_SoC
+coef_gamma_rate_SoC
+
 ```
 
 ```{r}
@@ -1042,6 +1117,95 @@ l_TTD_SoC_weibull$coefficients
 
 coef_TTD_weibull_shape_SoC <- l_TTD_SoC_weibull$coefficients["shape"]
 coef_TTD_weibull_scale_SoC <- l_TTD_SoC_weibull$coefficients["scale"]
+
+# ============================================================================
+# GAMMA DISTRIBUTION PARAMETERS FOR TTD (Time To Death)
+# ============================================================================
+#
+# HEALTH ECONOMIC CONTEXT:
+# Time to death (overall survival, OS) is a critical endpoint in oncology
+# economic evaluations. The choice of parametric distribution for OS can
+# substantially impact cost-effectiveness results, especially for:
+#   1. Long-term survival extrapolation beyond trial follow-up
+#   2. Calculation of life-years gained
+#   3. Estimation of lifetime costs
+#
+# GAMMA VS. WEIBULL FOR SURVIVAL DATA:
+# - Weibull: Hazard is monotonic (always increasing or always decreasing)
+#     h(t) = λα(λt)^(α-1) where α is shape, λ = 1/scale
+#     If α > 1: increasing hazard (worsening over time)
+#     If α < 1: decreasing hazard (improving over time)
+#     If α = 1: constant hazard (exponential distribution)
+#
+# - Gamma: Hazard can be non-monotonic (increase then plateau, etc.)
+#     More flexible for complex survival patterns
+#     Particularly useful when hazard initially increases but then stabilizes
+#
+# CLINICAL RELEVANCE FOR TIME-TO-DEATH:
+# In cancer trials, mortality patterns may not follow simple monotonic hazards:
+#   - Early period: high hazard due to aggressive disease progression
+#   - Later period: lower hazard in long-term survivors (selected population)
+#   - Plateau: some patients may achieve long-term disease control
+# Gamma distribution can capture this "bathtub" or "hump-shaped" hazard
+# better than Weibull in some cases.
+#
+# EXTRAPOLATION IMPLICATIONS:
+# Choice of survival distribution has major impact on extrapolated long-term
+# survival, which drives:
+#   - Total QALYs gained (especially if trial follow-up is limited)
+#   - Long-term treatment costs
+#   - Incremental cost-effectiveness ratio (ICER)
+#
+# SCENARIO ANALYSIS JUSTIFICATION:
+# Testing gamma as a scenario addresses structural uncertainty in our model:
+#   - Are our cost-effectiveness conclusions robust to distributional choice?
+#   - Does the ICER change meaningfully with a more flexible survival model?
+# This is recommended by:
+#   - NICE Decision Support Unit Technical Support Document 14 (survival analysis)
+#   - ISPOR-SMDM Good Practice Guidelines for survival extrapolation
+#   - Many HTA agencies (CADTH, PBAC, etc.)
+#
+# MATHEMATICAL PROPERTIES OF GAMMA FOR TTD:
+# The gamma survival function is:
+#   S(t) = P(T > t) = 1 - F(t) = Γ(α, βt) / Γ(α)
+# where Γ(α, βt) is the upper incomplete gamma function
+#
+# Mean survival time: E[T] = α/β = shape/rate
+# Variance: Var[T] = α/β² = shape/rate²
+#
+# This means:
+#   - For a given mean survival, higher shape → less variability
+#   - Rate parameter scales the time axis
+#
+# Extract the gamma distribution coefficients from the fitted model object
+# Display full coefficients for transparency and model documentation
+l_TTD_SoC_gamma$coefficients
+
+# Extract shape parameter for time-to-death (overall survival)
+# NOTE: flexsurv returns log(shape), stored on log scale here
+# This parameter controls whether mortality risk:
+#   - Decreases over time (shape < 1, after exp)
+#   - Stays constant (shape = 1, after exp → exponential)
+#   - Increases then plateaus (shape > 1, after exp)
+# Will be exponentiated when used in pgamma() function
+coef_TTD_gamma_shape_SoC <- l_TTD_SoC_gamma$coefficients["shape"]
+
+# Extract rate parameter for time-to-death
+# NOTE: flexsurv returns log(rate), stored on log scale here
+# This parameter controls the overall speed of mortality events
+# Higher rate (after exp) → events happen faster → shorter median survival
+# Combined with shape, determines:
+#   - Median survival time
+#   - Long-term survival probability (tail behavior)
+#   - Expected life-years
+# Will be exponentiated when used in pgamma() function
+coef_TTD_gamma_rate_SoC <- l_TTD_SoC_gamma$coefficients["rate"]
+
+# Display extracted parameters for verification and model documentation
+# These values are on the log scale and will need exp() transformation
+coef_TTD_gamma_shape_SoC
+coef_TTD_gamma_rate_SoC
+
 ```
 
 ```{r}
@@ -3682,6 +3846,100 @@ source(file = "oncologySemiMarkov_function.R")
 # If I change any code in this main model code file, I will also need to update the function that I call.
 
 
+# ============================================================================
+# PARAMETRIC SURVIVAL CURVE CHOICE - DISTRIBUTION SELECTION MECHANISM
+# ============================================================================
+#
+# HEALTH ECONOMIC MODELLING PRINCIPLE:
+# Cost-effectiveness models rely on extrapolation of survival curves beyond
+# observed trial data. The choice of parametric distribution is a key
+# structural assumption that can significantly impact results.
+#
+# STRUCTURAL UNCERTAINTY IN HEALTH ECONOMIC MODELS:
+# Structural uncertainty refers to uncertainty about the fundamental form
+# of the model itself, as opposed to parameter uncertainty (uncertainty about
+# parameter values within a fixed model structure).
+#
+# For survival extrapolation, structural uncertainty includes:
+#   - Which parametric family to use (Weibull, gamma, log-normal, etc.)
+#   - Whether to use single-curve or multi-curve approaches
+#   - How to model treatment effects (hazard ratios vs. separate curves)
+#
+# SCENARIO ANALYSIS IN HEALTH ECONOMICS:
+# Best practice (per NICE, ISPOR, CADTH guidelines) is to:
+#   1. Fit multiple candidate distributions to the data
+#   2. Select a base case based on:
+#        - Statistical fit criteria (AIC, BIC)
+#        - Visual fit to observed data
+#        - Clinical plausibility of extrapolated tail
+#        - Goodness-of-fit tests
+#   3. Test alternative distributions in scenario analyses
+#   4. Report how cost-effectiveness conclusions change across scenarios
+#   5. If results are highly sensitive, consider this in decision-making
+#
+# IMPLEMENTATION APPROACH:
+# We implement a "curve_choice" parameter that acts as a switch:
+#   - "weibull": Use Weibull distribution (BASE CASE)
+#   - "gamma": Use gamma distribution (SCENARIO ANALYSIS)
+#
+# WHY THIS DESIGN:
+# This approach allows us to run the entire analysis (base case + sensitivity
+# analyses) under different distributional assumptions without duplicating code.
+# The same model structure is used; only the survival probabilities change.
+#
+# HOW IT WORKS - TECHNICAL IMPLEMENTATION:
+# 1. Set curve_choice here (before running model)
+# 2. This parameter is passed to the oncologySemiMarkov function
+# 3. Inside the function, conditional logic selects the appropriate p*() function:
+#      if curve_choice == "weibull": use pweibull()
+#      if curve_choice == "gamma": use pgamma()
+# 4. Hazard ratios are applied identically regardless of base distribution
+#
+# THEORETICAL JUSTIFICATION - HAZARD RATIO INVARIANCE:
+# Hazard ratios can be applied to any parametric survival distribution because:
+#   - HR operates on the hazard function: h_exp(t) = HR × h_control(t)
+#   - This transforms to survival via: S(t) = exp(-∫h(u)du) = exp(-H(t))
+#   - For any distribution: H(t) = -log(S(t))
+#   - Apply HR: H_exp(t) = HR × H_control(t)
+#   - Back to survival: S_exp(t) = exp(-HR × H_control(t)) = [S_control(t)]^HR
+# This works for Weibull, gamma, or any other parametric distribution.
+#
+# HEALTH ECONOMIC INTERPRETATION:
+# The hazard ratio represents the relative treatment effect - how much the
+# experimental treatment changes the instantaneous risk of an event compared
+# to standard of care. This relative effect is assumed to be constant over time
+# (proportional hazards assumption) and can be applied to any baseline hazard.
+#
+# BASE CASE: Use Weibull distribution
+# Weibull selected as base case because:
+#   - Commonly used in oncology health economic models
+#   - Flexible hazard function (monotonically increasing or decreasing)
+#   - Good statistical fit to the observed data
+#   - Clinically plausible long-term extrapolation
+curve_choice <- "weibull"
+
+# SCENARIO ANALYSIS: To run gamma scenario, uncomment the line below and comment the line above
+# curve_choice <- "gamma"
+
+# NOTE ON GAMMA PARAMETERS:
+# The oncologySemiMarkov function accesses survival distribution parameters
+# from the environment (they're not all in l_params_all for the base case).
+#
+# For the function to work with EITHER Weibull OR Gamma, both sets of
+# parameters need to be defined as variables before calling the function.
+#
+# FOR WEIBULL (already defined earlier in the survival analysis section):
+#   - coef_weibull_shape_SoC, coef_weibull_scale_SoC (for TTP)
+#   - coef_TTD_weibull_shape_SoC, coef_TTD_weibull_scale_SoC (for TTD)
+#
+# FOR GAMMA (defined earlier in the survival analysis section):
+#   - coef_gamma_shape_SoC, coef_gamma_rate_SoC (for TTP)
+#   - coef_TTD_gamma_shape_SoC, coef_TTD_gamma_rate_SoC (for TTD)
+#
+# These were extracted earlier and should already exist in the environment.
+# The function will use the appropriate set based on curve_choice.
+
+
 # Create list l_params_all with all input probabilities, costs, utilities, etc.,
 
 # Test whether the function works (and generates the same results)
@@ -3734,8 +3992,9 @@ l_params_all <- list(
 # Test function
 
 # Test whether the function works (and generates the same results)
-
-oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp)
+# Now passing curve_choice to control which parametric distribution is used
+# This allows the function to switch between Weibull (base case) and gamma (scenario)
+oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp, curve_choice = curve_choice)
 
 # OK, so I was wondering why the values reported by the PSA/Tornado plot, differed so significantly to the values found with the baseline Markov model.
 # Reviewing the code, I've determined that the reason for these differences is the manner in which the disutility of adverse events is handled in the function in comparison to the baseline analysis in the R Markdown document.
@@ -3778,6 +4037,225 @@ oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp)
 #Standard of Care Experimental Treatment <- Effects
 #0.3346428 0.6461645
 
+```
+
+```{r}
+# ============================================================================
+# GAMMA DISTRIBUTION SCENARIO ANALYSIS - IRELAND ONLY
+# ============================================================================
+#
+# SCENARIO ANALYSIS RATIONALE:
+# This section implements a scenario analysis where we test the impact of
+# using the gamma distribution instead of Weibull for survival extrapolation.
+# This addresses structural uncertainty in our cost-effectiveness model.
+#
+# HEALTH ECONOMIC IMPORTANCE:
+# The choice of parametric survival distribution can substantially affect:
+#   1. Long-term survival extrapolation (beyond observed trial data)
+#   2. Total life-years (QALYs) gained by the intervention
+#   3. Lifetime treatment costs
+#   4. The resulting cost-effectiveness ratio (ICER)
+#
+# If the ICER is highly sensitive to distributional choice, this indicates
+# structural uncertainty that may affect decision-making. HTA agencies often
+# request scenario analyses exploring alternative distributions.
+#
+# IMPLEMENTATION APPROACH:
+# We will:
+#   1. Run the model with curve_choice = "weibull" (already done above)
+#   2. Store those results as the "Weibull base case"
+#   3. Run the model again with curve_choice = "gamma"
+#   4. Store those results as the "Gamma scenario"
+#   5. Compare the two sets of results in a table
+#   6. Interpret the sensitivity of our conclusions to distributional choice
+#
+# NOTE: We only run this for Ireland here. The same approach could be applied
+# to Germany and Spain if needed.
+
+# STEP 1: Store Weibull base case results (already calculated above)
+# We'll re-run it explicitly here for clarity and to store the results cleanly
+
+# Set curve choice to Weibull (base case)
+curve_choice_weibull <- "weibull"
+
+# Run the model with Weibull distribution
+# This function call uses all the parameters in l_params_all
+# Plus the Weibull coefficients from the environment:
+#   - coef_weibull_shape_SoC, coef_weibull_scale_SoC (for TTP)
+#   - coef_TTD_weibull_shape_SoC, coef_TTD_weibull_scale_SoC (for TTD)
+l_out_weibull <- oncologySemiMarkov(
+  l_params_all = l_params_all,
+  n_wtp        = n_wtp,
+  curve_choice = curve_choice_weibull
+)
+
+# Extract costs and QALYs for both strategies under Weibull
+# The function returns a data frame with columns: Strategy, Cost, Effect, DSAICER
+# Strategy 1 (row 1) is Standard of Care
+# Strategy 2 (row 2) is Experimental Treatment
+weibull_cost_soc <- l_out_weibull$Cost[1]    # Cost for SoC under Weibull
+weibull_cost_exp <- l_out_weibull$Cost[2]    # Cost for Exp under Weibull
+weibull_qaly_soc <- l_out_weibull$Effect[1]  # QALYs for SoC under Weibull
+weibull_qaly_exp <- l_out_weibull$Effect[2]  # QALYs for Exp under Weibull
+
+# Calculate incremental cost and QALYs for Weibull scenario
+# Incremental = Experimental minus Standard of Care
+weibull_inc_cost <- weibull_cost_exp - weibull_cost_soc
+weibull_inc_qaly <- weibull_qaly_exp - weibull_qaly_soc
+
+# Calculate ICER for Weibull scenario
+# ICER = Incremental Cost / Incremental QALY
+# This represents the cost per additional QALY gained with experimental treatment
+weibull_icer <- weibull_inc_cost / weibull_inc_qaly
+
+# Display Weibull results for verification
+cat("WEIBULL BASE CASE RESULTS (Ireland):\n")
+cat("SoC Cost: €", round(weibull_cost_soc, 2), "\n")
+cat("Exp Cost: €", round(weibull_cost_exp, 2), "\n")
+cat("SoC QALYs:", round(weibull_qaly_soc, 4), "\n")
+cat("Exp QALYs:", round(weibull_qaly_exp, 4), "\n")
+cat("Incremental Cost: €", round(weibull_inc_cost, 2), "\n")
+cat("Incremental QALYs:", round(weibull_inc_qaly, 4), "\n")
+cat("ICER: €", round(weibull_icer, 2), " per QALY\n\n")
+
+
+# STEP 2: Run Gamma scenario
+# Now we'll run the same model but with gamma distribution for survival
+
+# Set curve choice to gamma (scenario analysis)
+curve_choice_gamma <- "gamma"
+
+# Run the model with gamma distribution
+# This function call uses all the same parameters in l_params_all
+# But now uses gamma coefficients from the environment:
+#   - coef_gamma_shape_SoC, coef_gamma_rate_SoC (for TTP)
+#   - coef_TTD_gamma_shape_SoC, coef_TTD_gamma_rate_SoC (for TTD)
+# The function's internal logic switches from pweibull() to pgamma()
+# based on the curve_choice parameter
+l_out_gamma <- oncologySemiMarkov(
+  l_params_all = l_params_all,
+  n_wtp        = n_wtp,
+  curve_choice = curve_choice_gamma
+)
+
+# Extract costs and QALYs for both strategies under gamma
+# Same structure as Weibull results above
+gamma_cost_soc <- l_out_gamma$Cost[1]    # Cost for SoC under gamma
+gamma_cost_exp <- l_out_gamma$Cost[2]    # Cost for Exp under gamma
+gamma_qaly_soc <- l_out_gamma$Effect[1]  # QALYs for SoC under gamma
+gamma_qaly_exp <- l_out_gamma$Effect[2]  # QALYs for Exp under gamma
+
+# Calculate incremental cost and QALYs for gamma scenario
+gamma_inc_cost <- gamma_cost_exp - gamma_cost_soc
+gamma_inc_qaly <- gamma_qaly_exp - gamma_qaly_soc
+
+# Calculate ICER for gamma scenario
+gamma_icer <- gamma_inc_cost / gamma_inc_qaly
+
+# Display gamma results for verification
+cat("GAMMA SCENARIO RESULTS (Ireland):\n")
+cat("SoC Cost: €", round(gamma_cost_soc, 2), "\n")
+cat("Exp Cost: €", round(gamma_cost_exp, 2), "\n")
+cat("SoC QALYs:", round(gamma_qaly_soc, 4), "\n")
+cat("Exp QALYs:", round(gamma_qaly_exp, 4), "\n")
+cat("Incremental Cost: €", round(gamma_inc_cost, 2), "\n")
+cat("Incremental QALYs:", round(gamma_inc_qaly, 4), "\n")
+cat("ICER: €", round(gamma_icer, 2), " per QALY\n\n")
+
+
+# STEP 3: Create comparison table
+# Build a comprehensive table comparing Weibull and gamma scenarios
+
+# Create data frame with comparison results
+# Each row represents one scenario-strategy combination
+comparison_table <- data.frame(
+  Distribution = c("Weibull", "Weibull", "Gamma", "Gamma"),
+  Strategy = c("Standard of Care", "Experimental", "Standard of Care", "Experimental"),
+  Cost = c(weibull_cost_soc, weibull_cost_exp, gamma_cost_soc, gamma_cost_exp),
+  QALY = c(weibull_qaly_soc, weibull_qaly_exp, gamma_qaly_soc, gamma_qaly_exp),
+  Inc_Cost = c(NA, weibull_inc_cost, NA, gamma_inc_cost),
+  Inc_QALY = c(NA, weibull_inc_qaly, NA, gamma_inc_qaly),
+  ICER = c(NA, weibull_icer, NA, gamma_icer)
+)
+
+# Display the comparison table
+print("WEIBULL VS. GAMMA COMPARISON TABLE (Ireland):")
+print(comparison_table)
+
+# Calculate the difference in ICER between distributions
+# This quantifies the structural uncertainty
+icer_difference <- gamma_icer - weibull_icer
+icer_percent_change <- (gamma_icer - weibull_icer) / weibull_icer * 100
+
+cat("\n")
+cat("INTERPRETATION OF RESULTS:\n")
+cat("==========================\n")
+cat("ICER under Weibull:  €", round(weibull_icer, 2), " per QALY\n")
+cat("ICER under Gamma:    €", round(gamma_icer, 2), " per QALY\n")
+cat("Absolute difference: €", round(icer_difference, 2), " per QALY\n")
+cat("Relative change:     ", round(icer_percent_change, 2), "%\n\n")
+
+# Interpret the sensitivity based on the magnitude of change
+# HEALTH ECONOMIC INTERPRETATION:
+# - Small change (<10%): Results are robust to distributional choice
+# - Moderate change (10-25%): Some structural uncertainty, but conclusions likely stable
+# - Large change (>25%): Substantial structural uncertainty, may affect decision
+#
+# We also compare to the willingness-to-pay threshold for Ireland (€45,000/QALY)
+# to see if the cost-effectiveness conclusion changes
+wtp_ireland <- 45000
+
+# Check if cost-effectiveness conclusion changes
+weibull_cost_effective <- weibull_icer <= wtp_ireland
+gamma_cost_effective <- gamma_icer <= wtp_ireland
+
+if (weibull_cost_effective == gamma_cost_effective) {
+  cat("COST-EFFECTIVENESS CONCLUSION: CONSISTENT\n")
+  if (weibull_cost_effective) {
+    cat("The intervention is cost-effective under BOTH distributions\n")
+    cat("(ICER < €", wtp_ireland, "/QALY in both scenarios)\n\n")
+  } else {
+    cat("The intervention is NOT cost-effective under EITHER distribution\n")
+    cat("(ICER > €", wtp_ireland, "/QALY in both scenarios)\n\n")
+  }
+} else {
+  cat("COST-EFFECTIVENESS CONCLUSION: **CHANGES WITH DISTRIBUTION**\n")
+  cat("WARNING: The cost-effectiveness conclusion is sensitive to\n")
+  cat("         distributional choice. This represents substantial\n")
+  cat("         structural uncertainty that should be considered\n")
+  cat("         in decision-making.\n\n")
+}
+
+# Provide interpretation guidance
+if (abs(icer_percent_change) < 10) {
+  cat("STRUCTURAL UNCERTAINTY: LOW\n")
+  cat("The ICER changes by less than 10%, indicating that results are\n")
+  cat("robust to the choice between Weibull and gamma distributions.\n")
+} else if (abs(icer_percent_change) < 25) {
+  cat("STRUCTURAL UNCERTAINTY: MODERATE\n")
+  cat("The ICER changes by 10-25%, indicating some structural uncertainty.\n")
+  cat("The cost-effectiveness conclusion is likely stable, but the magnitude\n")
+  cat("of cost-effectiveness varies with distributional choice.\n")
+} else {
+  cat("STRUCTURAL UNCERTAINTY: HIGH\n")
+  cat("The ICER changes by more than 25%, indicating substantial structural\n")
+  cat("uncertainty. Consider additional scenario analyses and potentially\n")
+  cat("other survival distributions. The choice of distribution meaningfully\n")
+  cat("affects the cost-effectiveness conclusion.\n")
+}
+
+# NOTE ON FURTHER ANALYSIS:
+# If structural uncertainty is high, consider:
+#   1. Testing additional distributions (log-normal, log-logistic, etc.)
+#   2. Exploring alternative approaches (spline models, mixture models)
+#   3. Obtaining longer-term follow-up data to reduce extrapolation uncertainty
+#   4. Consulting clinical experts on plausibility of long-term extrapolations
+#   5. Reporting a range of ICERs across plausible distributions
+
+```
+
+
+```{r}
 
 
 
