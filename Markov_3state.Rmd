@@ -4182,6 +4182,19 @@ comparison_table <- data.frame(
 print("WEIBULL VS. GAMMA COMPARISON TABLE (Ireland):")
 print(comparison_table)
 
+# Save comparison table to CSV for use in paper
+# Create outputs directory if it doesn't exist
+if (!dir.exists("outputs")) dir.create("outputs", recursive = TRUE)
+
+# Write comparison table to CSV file
+write.csv(
+  comparison_table,
+  file = file.path("outputs", "Weibull_vs_Gamma_Ireland.csv"),
+  row.names = FALSE
+)
+
+cat("\nComparison table saved to: outputs/Weibull_vs_Gamma_Ireland.csv\n")
+
 # Calculate the difference in ICER between distributions
 # This quantifies the structural uncertainty
 icer_difference <- gamma_icer - weibull_icer
