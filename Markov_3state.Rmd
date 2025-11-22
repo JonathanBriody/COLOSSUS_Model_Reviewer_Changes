@@ -259,6 +259,10 @@ country_min_discount_rate     <- 0.00
 # country_min_discount_rate     <- 0.00
 
 
+# Create output directory if it doesn't exist
+if (!dir.exists("output")) {
+  dir.create("output", recursive = TRUE)
+}
 
 
 
@@ -470,7 +474,7 @@ survfit2(Surv(time, status) ~ 1, data = df_TTP) %>% ggsurvfit() +
   ) + 
   add_risktable()
 #print(plot)
-ggsave("Baseline_PFS_Curves.png", width = 8, height = 4, dpi=600)
+ggsave(file.path("output", "Baseline_PFS_Curves.png"), width = 8, height = 4, dpi=600)
 #dev.off()
 while (!is.null(dev.list()))  dev.off()
 
@@ -491,7 +495,7 @@ survfit2(Surv(time, status) ~ 1, data = df_TTD) %>% ggsurvfit() +
     y = "Overall survival probability"
   ) + 
   add_risktable()
-ggsave("Baseline_OS_Curves.png", width = 4, height = 4, dpi=600)
+ggsave(file.path("output", "Baseline_OS_Curves.png"), width = 4, height = 4, dpi=600)
 #png(paste("Baseline_OS_Curves", ".png"))
 #dev.off()
 while (!is.null(dev.list()))  dev.off()
@@ -863,15 +867,10 @@ df_AIC_BIC_TTP <- df_AIC_BIC_TTP[order(df_AIC_BIC_TTP$AIC), ]
 print(df_AIC_BIC_TTP)
 
 # Step 6: Save the table as a CSV file for use in manuscript/supplement
-# Create an 'outputs' directory if it doesn't already exist
-if (!dir.exists("outputs")) {
-  dir.create("outputs", recursive = TRUE)
-}
-
 # Write the AIC/BIC table to a CSV file
 write.csv(
   df_AIC_BIC_TTP,
-  file = "outputs/AIC_BIC_TTP.csv",
+  file = file.path("output", "AIC_BIC_TTP.csv"),
   row.names = FALSE
 )
 
@@ -1085,15 +1084,10 @@ df_AIC_BIC_TTD <- df_AIC_BIC_TTD[order(df_AIC_BIC_TTD$AIC), ]
 print(df_AIC_BIC_TTD)
 
 # Step 6: Save the table as a CSV file for use in manuscript/supplement
-# Create an 'outputs' directory if it doesn't already exist
-if (!dir.exists("outputs")) {
-  dir.create("outputs", recursive = TRUE)
-}
-
 # Write the AIC/BIC table to a CSV file
 write.csv(
   df_AIC_BIC_TTD,
-  file = "outputs/AIC_BIC_TTD.csv",
+  file = file.path("output", "AIC_BIC_TTD.csv"),
   row.names = FALSE
 )
 
@@ -1273,7 +1267,7 @@ survfit2(Surv(time, status) ~ group, data = df_combined_TTP) %>% ggsurvfit() +
   theme_minimal()
 
 # Save the plot
-ggsave("Baseline_PFS_Curves_BothEXPANDSOC.png", width = 8, height = 6, dpi = 600)
+ggsave(file.path("output", "Baseline_PFS_Curves_BothEXPANDSOC.png"), width = 8, height = 6, dpi = 600)
 
 # Here I update the height of the image to push the title closer to the middle.
 
@@ -1317,7 +1311,7 @@ survfit2(Surv(time, status) ~ group, data = df_combined_TTD) %>% ggsurvfit() +
 # [1]    0  319  638  957 1276 1595 1914 2233 2552 2871
 
 # Save the plot
-ggsave("Baseline_OS_Curves_BothEXPANDSOC.png", width = 8, height = 4, dpi = 600)
+ggsave(file.path("output", "Baseline_OS_Curves_BothEXPANDSOC.png"), width = 8, height = 4, dpi = 600)
 
 # Close any remaining graphics devices
 while (!is.null(dev.list())) dev.off()
@@ -3796,7 +3790,7 @@ Incremental_Effect<- round(df_cea$Inc_Effect[2], digits=3)
 ICER<- noquote(table_cea$"ICER"[2])
 
 # Save the dataframe of the CEA table to a CSV file
-write.csv(df_cea, file = paste0("Baseline_ICER_For_", country_name, ".csv"), row.names = FALSE)
+write.csv(df_cea, file = file.path("output", paste0("Baseline_ICER_For_", country_name, ".csv")), row.names = FALSE)
 
 ```
 
@@ -3804,7 +3798,7 @@ write.csv(df_cea, file = paste0("Baseline_ICER_For_", country_name, ".csv"), row
 #07.4 Plot frontier of the Markov model
 
 plot(df_cea, effect_units = "QALYs", label = "all")
-ggsave(paste("Frontier_Markov_Model_", country_name[1], ".png", sep = ""), width = 8, height = 4, dpi=600)
+ggsave(file.path("output", paste("Frontier_Markov_Model_", country_name[1], ".png", sep = "")), width = 8, height = 4, dpi=600)
 
 
 
@@ -4183,17 +4177,14 @@ print("WEIBULL VS. GAMMA COMPARISON TABLE (Ireland):")
 print(comparison_table)
 
 # Save comparison table to CSV for use in paper
-# Create outputs directory if it doesn't exist
-if (!dir.exists("outputs")) dir.create("outputs", recursive = TRUE)
-
 # Write comparison table to CSV file
 write.csv(
   comparison_table,
-  file = file.path("outputs", "Weibull_vs_Gamma_Ireland.csv"),
+  file = file.path("output", "Weibull_vs_Gamma_Ireland.csv"),
   row.names = FALSE
 )
 
-cat("\nComparison table saved to: outputs/Weibull_vs_Gamma_Ireland.csv\n")
+cat("\nComparison table saved to: output/Weibull_vs_Gamma_Ireland.csv\n")
 
 # Calculate the difference in ICER between distributions
 # This quantifies the structural uncertainty
@@ -5133,7 +5124,7 @@ tornado_plot <- tornado_plot +
 # Health economic value: High-resolution outputs ensure visual details
 # (parameter labels, axis values) are crisp and readable in publications
 ggsave(
-  paste("Tornado_Diagram_", country_name[1], ".png", sep = ""),
+  file.path("output", paste("Tornado_Diagram_", country_name[1], ".png", sep = "")),
   plot = tornado_plot,
   width = 8,
   height = 4,
@@ -5249,7 +5240,7 @@ unlimited_tornado_plot <- unlimited_tornado_plot +
 # Health economic value: Consistent dimensions and resolution allow side-by-side
 # comparison of the two versions without visual bias from different sizes
 ggsave(
-  paste("Unlimited_Tornado_Diagram_", country_name[1], ".png", sep = ""),
+  file.path("output", paste("Unlimited_Tornado_Diagram_", country_name[1], ".png", sep = "")),
   plot = unlimited_tornado_plot,
   width = 8,      # Same as limited version
   height = 4,     # Same as limited version
@@ -6023,10 +6014,10 @@ tornado_plot_top10 <- tornado_plot_top10 +
 # BEST PRACTICE FOLDER STRUCTURE:
 # - /code or /R: R scripts and Rmd files
 # - /data or /inputs: Input data files
-# - /outputs or /results: Generated outputs (plots, tables, CSVs)
+# - /output or /results: Generated outputs (plots, tables, CSVs)
 # - /docs: Documentation and manuscripts
 #
-# By saving outputs to an "outputs/" folder, we:
+# By saving outputs to an "output/" folder, we:
 # - Keep the repository root clean
 # - Make it easy to find all results in one place
 # - Enable .gitignore rules to exclude outputs if needed
@@ -6035,31 +6026,8 @@ tornado_plot_top10 <- tornado_plot_top10 +
 # MODELING APPROACH:
 # -----------------------------------------------------------------------------
 # We use base R's file system functions to:
-# 1. Check if the outputs/ folder exists
-# 2. Create it if it doesn't exist
-# 3. Construct the full file path for our plot
-# 4. Save the plot with ggsave at high resolution
-
-# Check if the "outputs" folder exists, and create it if not
-# dir.exists() returns TRUE if the folder exists, FALSE otherwise
-# The ! operator means NOT, so !dir.exists() means "if NOT exists"
-# This is a safe approach - it won't error if the folder already exists
-# Health economic value: Ensuring reproducibility across different environments
-if (!dir.exists("outputs")) {
-
-  # Create the outputs folder
-  # dir.create() creates a new folder
-  # recursive = TRUE means it will create parent folders if needed
-  # For example, if we wanted "outputs/plots/tornado", it would create all levels
-  # Health economic interpretation: Setting up organized output structure
-  # Modeling interpretation: Ensuring the target folder exists before saving
-  dir.create("outputs", recursive = TRUE)
-
-  # Print a message confirming folder creation
-  # This appears in the console for transparency
-  # Health economic value: Transparent reporting of file operations
-  print("Created 'outputs' folder for results")
-}
+# 1. Construct the full file path for our plot
+# 2. Save the plot with ggsave at high resolution
 
 # Construct the full file path for our plot
 # file.path() joins path components with the correct separator for the OS
@@ -6070,8 +6038,8 @@ if (!dir.exists("outputs")) {
 # Practical value: Lowercase filenames avoid case-sensitivity issues
 filename_top10 <- file.path(
   # First argument: the folder name
-  # All files will be saved in the "outputs" folder
-  "outputs",
+  # All files will be saved in the "output" folder
+  "output",
 
   # Second argument: the filename
   # We construct this dynamically using the country name
@@ -6094,7 +6062,7 @@ print(paste("Saving top 10 tornado plot to:", filename_top10))
 ggsave(
   # First argument: the filename (including path)
   # This is where the file will be saved
-  # Example: "outputs/tornado_top10_ireland.png"
+  # Example: "output/tornado_top10_ireland.png"
   filename_top10,
 
   # Specify which plot object to save
@@ -6141,9 +6109,8 @@ while (!is.null(dev.list())) dev.off()
 print(paste("Top 10 tornado plot saved successfully as:", filename_top10))
 
 # At this point we have:
-# - Created outputs/ folder if needed
 # - Saved high-resolution PNG of top 10 tornado plot
-# - Filename: outputs/tornado_top10_<country>.png (e.g., outputs/tornado_top10_ireland.png)
+# - Filename: output/tornado_top10_<country>.png (e.g., output/tornado_top10_ireland.png)
 
 # ============================================================================
 # STEP 9: CREATE VERSION WITHOUT AXIS LIMITS (FOR COMPARISON)
@@ -6250,11 +6217,11 @@ unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
 
 # Construct the filename for the unlimited version
 # We add "unlimited" to the filename to distinguish it
-# This creates filenames like: outputs/tornado_top10_unlimited_ireland.png
+# This creates filenames like: output/tornado_top10_unlimited_ireland.png
 # Health economic value: Clear, organized file naming
 file_unlimited_top10 <- file.path(
-  # Save in the same outputs folder
-  "outputs",
+  # Save in the same output folder
+  "output",
   # Filename includes "unlimited" to indicate the variant
   # This makes it easy to distinguish from the limited version
   paste0("tornado_top10_unlimited_", tolower(country_name[1]), ".png")
@@ -6301,7 +6268,7 @@ print(paste("Unlimited top 10 tornado plot saved successfully as:", file_unlimit
 #
 # OUTPUTS GENERATED BY THIS SECTION:
 # -----------------------------------------------------------------------------
-# At this point, you should have FOUR tornado plot files in the outputs/ folder:
+# At this point, you should have FOUR tornado plot files in the output/ folder:
 #
 # From previous sections (full set of parameters):
 # 1. Tornado_Diagram_<Country>.png - All parameters with axis limits
@@ -6396,7 +6363,7 @@ print(paste("Unlimited top 10 tornado plot saved successfully as:", file_unlimit
 # -----------------------------------------------------------------------------
 # After running for all three countries, verify:
 #
-# □ Six files exist in outputs/ (2 per country: limited and unlimited)
+# □ Six files exist in output/ (2 per country: limited and unlimited)
 # □ All plots show exactly 10 parameters
 # □ Parameters are sorted by impact (longest bars at top)
 # □ Axis labels are clear and include units
@@ -8965,10 +8932,10 @@ print(psa_summary_table)
 #
 # FILE ORGANIZATION:
 # -----------------------------------------------------------------------------
-# We use an "outputs/" subdirectory to:
+# We use an "output/" subdirectory to:
 # - Keep analysis outputs separate from code and input data
 # - Make it easy to find all generated files
-# - Allow adding outputs/ to .gitignore if desired (to avoid tracking large files)
+# - Allow adding output/ to .gitignore if desired (to avoid tracking large files)
 #
 # FILE NAMING CONVENTION:
 # -----------------------------------------------------------------------------
@@ -8983,22 +8950,6 @@ print(psa_summary_table)
 # - Includes country context for organization
 # - Uses consistent format for programmatic access
 
-# Create outputs directory if it doesn't exist
-# ----------------------------------------------
-# dir.exists(): Checks if the "outputs" directory exists
-# dir.create(): Creates the directory if it doesn't exist
-#   - recursive = TRUE: Creates parent directories if needed
-#   - This is safe to run even if the directory already exists
-#
-# This ensures the directory exists before we try to save files to it,
-# preventing "path not found" errors
-#
-# Health economic value: Organized file structure facilitates reproducibility
-if (!dir.exists("outputs")) {
-  dir.create("outputs", recursive = TRUE)
-  cat("\nCreated 'outputs/' directory for saving results.\n")
-}
-
 # Save the raw summary table to CSV
 # ----------------------------------
 # RAW TABLE FORMAT:
@@ -9008,8 +8959,8 @@ if (!dir.exists("outputs")) {
 # - Can be imported into R and used for calculations
 #
 # file.path(): Constructs platform-independent file paths
-#   - On Windows: "outputs\\PSA_Summary_NMB_Ireland.csv"
-#   - On Mac/Linux: "outputs/PSA_Summary_NMB_Ireland.csv"
+#   - On Windows: "output\\PSA_Summary_NMB_Ireland.csv"
+#   - On Mac/Linux: "output/PSA_Summary_NMB_Ireland.csv"
 #
 # paste0(): Concatenates strings without separator (same as paste with sep="")
 #
@@ -9020,7 +8971,7 @@ if (!dir.exists("outputs")) {
 #
 # Health economic value: Preserves full numerical precision for transparency
 # and reproducibility of cost-effectiveness calculations
-output_filename <- file.path("outputs", paste0("PSA_Summary_NMB_", country_name, ".csv"))
+output_filename <- file.path("output", paste0("PSA_Summary_NMB_", country_name, ".csv"))
 write.csv(psa_summary_table, file = output_filename, row.names = FALSE)
 
 # Confirm successful save
@@ -9153,7 +9104,7 @@ print(psa_summary_formatted, row.names = FALSE)
 #
 # Health economic value: Streamlines manuscript preparation and reduces
 # transcription errors by providing publication-ready formatted output
-formatted_filename <- file.path("outputs", paste0("PSA_Summary_NMB_Formatted_", country_name, ".csv"))
+formatted_filename <- file.path("output", paste0("PSA_Summary_NMB_Formatted_", country_name, ".csv"))
 write.csv(psa_summary_formatted, file = formatted_filename, row.names = FALSE)
 
 # Confirm successful save
@@ -9172,7 +9123,7 @@ cat("\nFormatted summary table saved to:", formatted_filename, "\n\n")
 # 4. Raw CSV file with full numerical precision
 # 5. Formatted CSV file ready for manuscript inclusion
 #
-# FILES CREATED (in outputs/ directory):
+# FILES CREATED (in output/ directory):
 # -----------------------------------------------------------------------------
 # - PSA_Summary_NMB_<Country>.csv: Raw data with full precision
 # - PSA_Summary_NMB_Formatted_<Country>.csv: Publication-ready formatted version
@@ -9258,7 +9209,7 @@ df_cea_PA
 table_cea_PA <- format_table_cea(df_cea_PA) # Function included in "R/Functions.R"; depends on the `scales` package
 table_cea_PA
 # Save the dataframe of the CEA table to a CSV file
-write.csv(df_cea_PA, file = paste0("Probabilistic_ICER_For_", country_name, ".csv"), row.names = FALSE)
+write.csv(df_cea_PA, file = file.path("output", paste0("Probabilistic_ICER_For_", country_name, ".csv")), row.names = FALSE)
 
 ```
 
@@ -9286,7 +9237,7 @@ plot_title <- paste("Scatter Plot", country_name)
 ce_scatter_plot <- ce_scatter_plot + ggtitle(plot_title) + theme(plot.title = element_text(hjust = 0.5))
 
 # Save the plot to a file
-ggsave(paste("CE_Scatter_Plot_", country_name[1], ".png", sep = ""), plot = ce_scatter_plot, width = 8, height = 4, dpi = 600)
+ggsave(file.path("output", paste("CE_Scatter_Plot_", country_name[1], ".png", sep = "")), plot = ce_scatter_plot, width = 8, height = 4, dpi = 600)
 
 # Close the graphics device
 while (!is.null(dev.list())) dev.off()
@@ -9296,7 +9247,7 @@ while (!is.null(dev.list())) dev.off()
 unlimited_ce_scatter_plot <- plot(l_PA)
 plot_title <- paste("Scatter Plot", country_name)
 unlimited_ce_scatter_plot <- unlimited_ce_scatter_plot + ggtitle(plot_title) + theme(plot.title = element_text(hjust = 0.5))
-ggsave(paste("Unlimited_CE_Scatter_Plot_", country_name[1], ".png", sep = ""), plot = unlimited_ce_scatter_plot, width = 8, height = 4, dpi = 600)
+ggsave(file.path("output", paste("Unlimited_CE_Scatter_Plot_", country_name[1], ".png", sep = "")), plot = unlimited_ce_scatter_plot, width = 8, height = 4, dpi = 600)
 while (!is.null(dev.list())) dev.off()
 
 # I Create the plot object using plot(l_PA):
@@ -9374,7 +9325,7 @@ plot_title <- paste("CEAC Plot", country_name)
 ceac_plot <- ceac_plot + ggtitle(plot_title) + theme(plot.title = element_text(hjust = 0.45)) # AAgain I try to position the title in the middle of the plot.
 
 # Save the plot to a file
-ggsave(paste("CEAC_", country_name[1], ".png", sep = ""), plot = ceac_plot, width = 8, height = 4, dpi = 600)
+ggsave(file.path("output", paste("CEAC_", country_name[1], ".png", sep = "")), plot = ceac_plot, width = 8, height = 4, dpi = 600)
 
 # Close the graphics device
 while (!is.null(dev.list())) dev.off()

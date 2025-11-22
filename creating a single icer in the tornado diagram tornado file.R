@@ -491,7 +491,7 @@ DSAICER  <- run_owsa_det(
 # https://cran.r-project.org/web/packages/dampack/vignettes/dsa_generation.html 
 
 owsa_tornado(owsa = DSAICER, txtsize = 11)
-ggsave(paste("Tornado_Diagram_Singular_ICERs", country_name[1], ".png", sep = ""), width = 8, height = 4, dpi=300)
+ggsave(file.path("output", paste("Tornado_Diagram_Singular_ICERs", country_name[1], ".png", sep = "")), width = 8, height = 4, dpi=300)
 while (!is.null(dev.list()))  dev.off()
 #png(paste("Tornado_Diagram_", country_name[1], ".png", sep = ""))
 #dev.off()
