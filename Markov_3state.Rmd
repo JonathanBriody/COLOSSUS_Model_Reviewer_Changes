@@ -6285,6 +6285,248 @@ for(i_run in 1:n_runs){
 
 ```{r}
 
+#09.1.1 Calculate Incremental Outcomes and Net Monetary Benefit from PSA
+
+# THEORY:
+# -------
+# In a probabilistic sensitivity analysis (PSA), we run the model thousands of times,
+# each time sampling parameter values from their uncertainty distributions.
+# For each simulation (iteration), we obtain:
+#   - Cost_SoC: total discounted cost under standard of care
+#   - Cost_Exp: total discounted cost under experimental strategy (bevacizumab)
+#   - Effect_SoC: total discounted QALYs under standard of care
+#   - Effect_Exp: total discounted QALYs under experimental strategy
+#
+# From these simulated outcomes, we can calculate incremental (difference) values:
+#   - Incremental cost = Cost_Exp - Cost_SoC
+#   - Incremental QALY = Effect_Exp - Effect_SoC
+#
+# Net Monetary Benefit (NMB) is a decision-analytic metric that converts health outcomes
+# into monetary terms using a willingness-to-pay (WTP) threshold. NMB is calculated as:
+#   NMB = (Incremental QALY × WTP threshold) - Incremental cost
+#
+# A positive NMB indicates the experimental strategy provides value for money at the
+# given WTP threshold. By computing NMB across all PSA simulations, we quantify the
+# uncertainty in cost-effectiveness under probabilistic assumptions.
+#
+# CREDIBLE INTERVALS:
+# -------------------
+# Since each PSA simulation represents one plausible outcome under parameter uncertainty,
+# the distribution of incremental costs, QALYs, and NMB across simulations reflects our
+# uncertainty about these outcomes. We summarize this uncertainty using:
+#   - Mean: the average (expected) value across all simulations
+#   - 95% Credible Interval (CrI): the 2.5th and 97.5th percentiles, which define
+#     the range containing 95% of the simulated values
+#
+# The credible interval provides a probabilistic range for the true value given our
+# current parameter uncertainty and chosen distributions.
+#
+# IMPLEMENTATION:
+# ---------------
+# Below, we extract the PSA results stored in df_c (costs) and df_e (effects),
+# calculate incremental outcomes and NMB for each simulation, then compute summary
+# statistics (mean and 95% CrI) to report in our cost-effectiveness analysis.
+
+# Identify strategy column names from PSA results
+# ------------------------------------------------
+# The data frames df_c and df_e contain costs and QALYs for each PSA simulation.
+# We need to identify which columns correspond to SoC and the experimental strategy.
+# The column names may vary (e.g., "Exp" or "Bev"), so we check them dynamically.
+
+strat_names_c <- colnames(df_c)
+strat_names_e <- colnames(df_e)
+
+cat("\nPSA Results Summary:\n")
+cat("Number of PSA simulations:", nrow(df_c), "\n")
+cat("Cost strategies:", paste(strat_names_c, collapse = ", "), "\n")
+cat("Effect strategies:", paste(strat_names_e, collapse = ", "), "\n\n")
+
+# Identify SoC and experimental strategy columns
+# We assume "SoC" is always one column, and the other is the experimental strategy
+soc_col <- "SoC"
+exp_col <- setdiff(strat_names_c, "SoC")[1]  # The column that isn't "SoC"
+
+cat("Identified strategies:\n")
+cat("  Standard of Care:", soc_col, "\n")
+cat("  Experimental:", exp_col, "\n\n")
+
+# Extract costs and QALYs from PSA results
+# ------------------------------------------
+# df_c contains costs for each simulation (rows) and strategy (columns)
+# df_e contains QALYs for each simulation (rows) and strategy (columns)
+# Each row corresponds to one PSA iteration (simulation run)
+
+# Calculate incremental outcomes for each PSA simulation
+# -------------------------------------------------------
+# For each simulation, compute the difference between experimental and standard of care.
+# These vectors will have length equal to the number of PSA runs, with each element
+# representing one simulated incremental outcome.
+
+# Incremental cost = Cost under experimental strategy - Cost under standard of care
+# Positive values indicate the experimental strategy costs more
+incremental_costs <- df_c[, exp_col] - df_c[, soc_col]
+
+# Incremental QALYs = QALYs under experimental strategy - QALYs under standard of care
+# Positive values indicate the experimental strategy produces more QALYs (health benefit)
+incremental_qalys <- df_e[, exp_col] - df_e[, soc_col]
+
+# Calculate Net Monetary Benefit (NMB) for each PSA simulation
+# -------------------------------------------------------------
+# NMB converts the cost-effectiveness decision into monetary terms by valuing
+# QALYs at the willingness-to-pay threshold (n_wtp) for the current country.
+#
+# Formula: NMB = (Incremental QALY × WTP) - Incremental Cost
+#
+# Interpretation:
+#   - Positive NMB: experimental strategy is cost-effective (benefits exceed costs)
+#   - Negative NMB: experimental strategy is not cost-effective
+#   - NMB = 0: indifferent (benefits exactly equal costs at this WTP)
+
+incremental_nmb <- (incremental_qalys * n_wtp) - incremental_costs
+
+# Compute summary statistics: Mean and 95% Credible Intervals
+# ------------------------------------------------------------
+# For each outcome (cost, QALY, NMB), we calculate:
+#   - Mean: the expected (average) value across all PSA simulations
+#   - Lower bound of 95% CrI: 2.5th percentile (only 2.5% of simulations are below this)
+#   - Upper bound of 95% CrI: 97.5th percentile (only 2.5% of simulations are above this)
+#
+# Together, the 2.5th and 97.5th percentiles form a 95% credible interval,
+# which contains the central 95% of the simulated distribution.
+
+# Summary statistics for incremental costs
+inc_cost_mean <- mean(incremental_costs)
+inc_cost_lower <- quantile(incremental_costs, probs = 0.025)  # 2.5th percentile
+inc_cost_upper <- quantile(incremental_costs, probs = 0.975)  # 97.5th percentile
+
+# Summary statistics for incremental QALYs
+inc_qaly_mean <- mean(incremental_qalys)
+inc_qaly_lower <- quantile(incremental_qalys, probs = 0.025)
+inc_qaly_upper <- quantile(incremental_qalys, probs = 0.975)
+
+# Summary statistics for incremental NMB
+inc_nmb_mean <- mean(incremental_nmb)
+inc_nmb_lower <- quantile(incremental_nmb, probs = 0.025)
+inc_nmb_upper <- quantile(incremental_nmb, probs = 0.975)
+
+# Create a summary table for reporting
+# -------------------------------------
+# This table will contain one row with summary statistics for the current country.
+# The table format aligns with Table 2 in the manuscript, providing mean estimates
+# and 95% credible intervals for incremental costs, QALYs, and NMB.
+
+psa_summary_table <- data.frame(
+  Country = country_name,
+  WTP_Threshold = n_wtp,
+
+  # Incremental cost: mean and 95% CrI
+  Incremental_Cost_Mean = inc_cost_mean,
+  Incremental_Cost_Lower_CrI = inc_cost_lower,
+  Incremental_Cost_Upper_CrI = inc_cost_upper,
+
+  # Incremental QALY: mean and 95% CrI
+  Incremental_QALY_Mean = inc_qaly_mean,
+  Incremental_QALY_Lower_CrI = inc_qaly_lower,
+  Incremental_QALY_Upper_CrI = inc_qaly_upper,
+
+  # Incremental NMB: mean and 95% CrI
+  Incremental_NMB_Mean = inc_nmb_mean,
+  Incremental_NMB_Lower_CrI = inc_nmb_lower,
+  Incremental_NMB_Upper_CrI = inc_nmb_upper,
+
+  stringsAsFactors = FALSE
+)
+
+# Display the summary table
+# -------------------------
+cat("\n=======================================================\n")
+cat("PSA SUMMARY: Incremental Outcomes and Net Monetary Benefit\n")
+cat("=======================================================\n\n")
+cat("Country:", country_name, "\n")
+cat("Willingness-to-pay threshold: €", format(n_wtp, big.mark = ","), "\n")
+cat("Number of PSA simulations:", nrow(df_c), "\n\n")
+
+cat("INCREMENTAL COST (", exp_col, " vs ", soc_col, "):\n", sep = "")
+cat("  Mean: €", format(round(inc_cost_mean, 2), big.mark = ","), "\n")
+cat("  95% CrI: €", format(round(inc_cost_lower, 2), big.mark = ","),
+    " to €", format(round(inc_cost_upper, 2), big.mark = ","), "\n\n")
+
+cat("INCREMENTAL QALY (", exp_col, " vs ", soc_col, "):\n", sep = "")
+cat("  Mean:", round(inc_qaly_mean, 4), "\n")
+cat("  95% CrI:", round(inc_qaly_lower, 4), "to", round(inc_qaly_upper, 4), "\n\n")
+
+cat("INCREMENTAL NET MONETARY BENEFIT (", exp_col, " vs ", soc_col, "):\n", sep = "")
+cat("  Mean: €", format(round(inc_nmb_mean, 2), big.mark = ","), "\n")
+cat("  95% CrI: €", format(round(inc_nmb_lower, 2), big.mark = ","),
+    " to €", format(round(inc_nmb_upper, 2), big.mark = ","), "\n")
+cat("=======================================================\n\n")
+
+# Interpretation note for NMB
+if (inc_nmb_mean > 0) {
+  cat("NOTE: Positive mean NMB suggests the experimental strategy (", exp_col, ")\n", sep = "")
+  cat("      may be cost-effective at the €", format(n_wtp, big.mark = ","), " WTP threshold.\n\n")
+} else {
+  cat("NOTE: Negative mean NMB suggests the experimental strategy (", exp_col, ")\n", sep = "")
+  cat("      may not be cost-effective at the €", format(n_wtp, big.mark = ","), " WTP threshold.\n\n")
+}
+
+# Display the summary table in data frame format
+print(psa_summary_table)
+
+# Create outputs directory if it doesn't exist
+# ---------------------------------------------
+if (!dir.exists("outputs")) {
+  dir.create("outputs", recursive = TRUE)
+  cat("\nCreated 'outputs/' directory for saving results.\n")
+}
+
+# Save the summary table to CSV for manuscript preparation
+# --------------------------------------------------------
+# This CSV file can be used directly or reformatted for Table 2 in the manuscript.
+# The file name includes the country name for easy identification when running
+# the analysis for different countries.
+
+output_filename <- file.path("outputs", paste0("PSA_Summary_NMB_", country_name, ".csv"))
+write.csv(psa_summary_table, file = output_filename, row.names = FALSE)
+
+cat("\nSummary table saved to:", output_filename, "\n\n")
+
+# Optional: Create a formatted version for display
+# ------------------------------------------------
+# This creates a more readable version with proper formatting for costs and QALYs
+
+psa_summary_formatted <- data.frame(
+  Country = country_name,
+  WTP = paste0("€", format(n_wtp, big.mark = ",")),
+
+  `Incremental Cost (Mean)` = paste0("€", format(round(inc_cost_mean, 2), big.mark = ",")),
+  `Incremental Cost (95% CrI)` = paste0("€", format(round(inc_cost_lower, 2), big.mark = ","),
+                                         " to €", format(round(inc_cost_upper, 2), big.mark = ",")),
+
+  `Incremental QALY (Mean)` = round(inc_qaly_mean, 4),
+  `Incremental QALY (95% CrI)` = paste0(round(inc_qaly_lower, 4), " to ", round(inc_qaly_upper, 4)),
+
+  `Incremental NMB (Mean)` = paste0("€", format(round(inc_nmb_mean, 2), big.mark = ",")),
+  `Incremental NMB (95% CrI)` = paste0("€", format(round(inc_nmb_lower, 2), big.mark = ","),
+                                        " to €", format(round(inc_nmb_upper, 2), big.mark = ",")),
+
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+cat("\nFORMATTED SUMMARY TABLE (for manuscript):\n")
+print(psa_summary_formatted, row.names = FALSE)
+
+# Save formatted version as well
+formatted_filename <- file.path("outputs", paste0("PSA_Summary_NMB_Formatted_", country_name, ".csv"))
+write.csv(psa_summary_formatted, file = formatted_filename, row.names = FALSE)
+
+cat("\nFormatted summary table saved to:", formatted_filename, "\n\n")
+
+```
+
+```{r}
+
 #09.2 Create PSA object for dampack
 
 # Dampack has a number of functions to summarise and visualise the results of a probabilistic sensitivity analysis. However, the data needs to be in a specific structure before we can use those functions. 
