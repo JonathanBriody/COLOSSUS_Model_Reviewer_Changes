@@ -4462,11 +4462,1091 @@ while (!is.null(dev.list()))  dev.off()
 
 
 # Maybe use the below to change the formatting of the above:
-# TornadoPlot(main_title = "Tornado Plot", Parms = paramNames, Outcomes = m.tor, 
-#             outcomeName = "Incremental Cost-Effectiveness Ratio (ICER)", 
-#             xlab = "ICER", 
-#             ylab = "Parameters", 
+# TornadoPlot(main_title = "Tornado Plot", Parms = paramNames, Outcomes = m.tor,
+#             outcomeName = "Incremental Cost-Effectiveness Ratio (ICER)",
+#             xlab = "ICER",
+#             ylab = "Parameters",
 #             col1="#3182bd", col2="#6baed6")
+
+```
+
+## 08.2.1 Top 10 Most Influential Parameters - Simplified Tornado Plots
+
+```{r}
+
+# ============================================================================
+# SECTION PURPOSE: CREATE SIMPLIFIED TORNADO PLOTS (TOP 10 PARAMETERS ONLY)
+# ============================================================================
+#
+# HEALTH ECONOMIC RATIONALE FOR THIS ANALYSIS:
+# -----------------------------------------------------------------------------
+# In cost-effectiveness analysis, tornado plots are a key tool for communicating
+# parameter uncertainty and identifying research priorities. However, when many
+# parameters are included (as in our model with 30 parameters), the full tornado
+# plot can become:
+#
+# 1. VISUALLY CLUTTERED: Too many bars make it hard to see which parameters
+#    truly matter for decision-making
+#
+# 2. DIFFICULT TO INTERPRET: Decision-makers and reviewers may struggle to
+#    identify the key drivers of cost-effectiveness
+#
+# 3. UNSUITABLE FOR PUBLICATION: Journal space is limited; a focused plot
+#    is more effective than a comprehensive but cluttered one
+#
+# By focusing on the TOP 10 most influential parameters, we achieve several
+# health economic objectives:
+#
+# a) IMPROVED COMMUNICATION: Stakeholders can quickly identify which parameters
+#    have the largest impact on the ICER, facilitating informed discussion
+#
+# b) RESEARCH PRIORITIZATION: Parameters with large influence on cost-effectiveness
+#    should be prioritized for:
+#    - Additional data collection
+#    - Expert elicitation
+#    - Further validation studies
+#    - Threshold analysis
+#
+# c) VALUE OF INFORMATION ANALYSIS: High-impact parameters are candidates for
+#    Expected Value of Perfect Information (EVPI) analysis to determine whether
+#    additional research to reduce their uncertainty would be cost-effective
+#
+# d) TRANSPARENCY: By showing which assumptions matter most, we increase the
+#    transparency and credibility of the analysis
+#
+# e) BEST PRACTICE ALIGNMENT: This approach aligns with ISPOR-SMDM guidelines
+#    for good practices in model-based economic evaluation, which emphasize
+#    clear communication of uncertainty
+#
+# MODELING APPROACH AND METHODOLOGY:
+# -----------------------------------------------------------------------------
+# Our approach follows these steps:
+#
+# STEP 1: Calculate each parameter's "impact" on ICER
+#         Impact = Range of ICER values when parameter varies from min to max
+#
+# STEP 2: Rank all parameters by absolute impact (largest first)
+#
+# STEP 3: Select the top 10 most influential parameters
+#
+# STEP 4: Filter the OWSA results to include only these top 10
+#
+# STEP 5: Calculate sensible axis limits based on the ICER range for top 10
+#
+# STEP 6: Generate tornado plots with dampack's owsa_tornado() function
+#
+# STEP 7: Add appropriate labels, titles, and footnotes
+#
+# STEP 8: Save high-resolution plots for publication
+#
+# This methodology preserves the full OWSA results (all 30 parameters) while
+# creating publication-ready visualizations focused on the most important inputs.
+#
+# TECHNICAL NOTE ON OWSA STRUCTURE:
+# -----------------------------------------------------------------------------
+# The DSAICER object created by run_owsa_det() is a data frame with structure:
+#   - parameter: name of the parameter being varied
+#   - strategy: the strategy being evaluated
+#   - param_val: the value of the parameter in this sample
+#   - outcome_val: the resulting ICER at this parameter value
+#
+# For each parameter, there are nsamp=100 rows showing how ICER changes as
+# the parameter moves from its minimum to maximum value, holding all other
+# parameters at their base-case values.
+#
+# ============================================================================
+
+
+# ============================================================================
+# STEP 1: CALCULATE PARAMETER IMPACT ON ICER
+# ============================================================================
+#
+# HEALTH ECONOMIC CONCEPT - PARAMETER INFLUENCE:
+# -----------------------------------------------------------------------------
+# In sensitivity analysis, we want to identify which parameters have the
+# greatest influence on our cost-effectiveness conclusion. A parameter is
+# "influential" if small changes in its value lead to large changes in the ICER.
+#
+# WHY THIS MATTERS IN HEALTH ECONOMICS:
+# - High-impact parameters represent key uncertainties in the decision problem
+# - They determine whether an intervention appears cost-effective or not
+# - Reducing uncertainty in these parameters (through research) has high value
+# - They should be the focus of probabilistic sensitivity analysis (PSA)
+# - They may warrant scenario analysis or threshold analysis
+#
+# MATHEMATICAL DEFINITION OF IMPACT:
+# -----------------------------------------------------------------------------
+# For each parameter p, we define its impact as:
+#
+#   Impact(p) = max(ICER_p) - min(ICER_p)
+#
+# Where:
+#   - max(ICER_p) = highest ICER when p varies across its range
+#   - min(ICER_p) = lowest ICER when p varies across its range
+#
+# This measures the total swing in cost-effectiveness attributable to
+# uncertainty in parameter p.
+#
+# EXAMPLE INTERPRETATION:
+# If the impact of "Bevacizumab cost" is €50,000 per QALY, this means:
+# - When Bev cost is at its minimum, ICER might be €150,000/QALY
+# - When Bev cost is at its maximum, ICER might be €200,000/QALY
+# - The uncertainty in Bev cost creates a €50,000/QALY uncertainty in ICER
+# - This is a HIGH impact - Bev cost is a critical parameter
+#
+# MODELING APPROACH:
+# -----------------------------------------------------------------------------
+# We use dplyr to group the OWSA results by parameter and calculate summary
+# statistics for each parameter's influence on ICER.
+
+# Use the dplyr package to manipulate the OWSA results data frame
+# This allows us to group rows by parameter and calculate statistics
+library(dplyr)
+
+# Group the OWSA results by parameter name
+# For each parameter, we will calculate summary statistics
+# The group_by function creates groups based on unique parameter values
+parameter_impacts <- DSAICER %>%
+  # Group all rows by the 'parameter' column
+  # This means subsequent operations will be performed separately for each parameter
+  # Health economic interpretation: We're analyzing each input parameter independently
+  group_by(parameter) %>%
+
+  # Calculate summary statistics for each parameter group
+  # The summarise function creates one row per parameter with our calculated metrics
+  summarise(
+    # Calculate the minimum ICER value for this parameter
+    # This occurs when the parameter is at one extreme of its range
+    # Health economic interpretation: Best-case ICER scenario for this parameter
+    min_icer = min(outcome_val),
+
+    # Calculate the maximum ICER value for this parameter
+    # This occurs when the parameter is at the other extreme of its range
+    # Health economic interpretation: Worst-case ICER scenario for this parameter
+    max_icer = max(outcome_val),
+
+    # Calculate the range = difference between max and min
+    # This is the total "swing" in ICER caused by this parameter's uncertainty
+    # Health economic interpretation: The parameter's influence on cost-effectiveness
+    # Modeling interpretation: The width of the tornado bar for this parameter
+    impact = max_icer - min_icer,
+
+    # Calculate the absolute value of impact
+    # We use absolute value because we only care about magnitude, not direction
+    # Some parameters increase ICER (positive impact), others decrease it (negative)
+    # For ranking purposes, we want the largest magnitude regardless of direction
+    # Health economic interpretation: The size of uncertainty this parameter creates
+    abs_impact = abs(impact)
+  ) %>%
+
+  # Sort the parameters by absolute impact, largest first
+  # This puts the most influential parameters at the top of our data frame
+  # Health economic interpretation: Ranking parameters by research priority
+  # Modeling interpretation: Ordering for selection of top N parameters
+  arrange(desc(abs_impact))
+
+# Display the parameter impacts table in the console
+# This allows us to review which parameters are most influential
+# Health economic value: Transparent reporting of sensitivity analysis results
+# Practical use: Helps us verify that our top 10 selection makes clinical sense
+print("Parameter Impacts on ICER (sorted by influence):")
+print(parameter_impacts)
+
+# The output will show a table like:
+# parameter                          min_icer  max_icer  impact    abs_impact
+# Bevacizumab Cost                   120000    200000    80000     80000
+# HR First - Second Line Bev         140000    180000    40000     40000
+# ...etc
+
+# ============================================================================
+# STEP 2: SELECT TOP 10 MOST INFLUENTIAL PARAMETERS
+# ============================================================================
+#
+# HEALTH ECONOMIC RATIONALE FOR TOP 10 SELECTION:
+# -----------------------------------------------------------------------------
+# We select exactly 10 parameters as a balance between:
+#
+# COMPREHENSIVENESS: Showing enough parameters to give a complete picture
+# of model uncertainty and validate that we've captured key drivers
+#
+# PARSIMONY: Not overwhelming the reader with too many parameters, most of
+# which may have minimal influence on the decision
+#
+# PRACTICAL UTILITY: 10 parameters is manageable for:
+# - Discussion in a manuscript (can describe each one)
+# - Presentation slides (fits on one readable chart)
+# - Value of information analysis (computationally feasible)
+# - Threshold analysis (can explore each parameter)
+#
+# PRECEDENT: The top 10 approach is commonly used in health economic publications
+# and is consistent with guidelines from ISPOR and NICE
+#
+# MODELING APPROACH:
+# -----------------------------------------------------------------------------
+# We use dplyr's slice() function to take the first 10 rows from our
+# already-sorted parameter_impacts data frame, then extract just the parameter
+# names into a character vector.
+
+# Take the first 10 rows from parameter_impacts
+# Remember: parameter_impacts is already sorted by abs_impact (largest first)
+# So this gives us the 10 parameters with the highest absolute impact
+# Health economic interpretation: These are our 10 highest research priorities
+top10_parameters <- parameter_impacts %>%
+
+  # The slice function selects rows by position
+  # slice(1:10) means "take rows 1 through 10"
+  # Since our data is sorted by impact (descending), these are the top 10
+  # Modeling interpretation: Filtering to the most influential subset
+  slice(1:10) %>%
+
+  # The pull function extracts a single column as a vector
+  # pull(parameter) gives us just the parameter names, not the whole data frame
+  # This creates a character vector like: c("Bevacizumab Cost", "HR First - Second Line Bev", ...)
+  # Health economic interpretation: Creating our focused parameter list
+  # Modeling interpretation: Preparing the filter vector for subsetting DSAICER
+  pull(parameter)
+
+# Display the top 10 parameter names for review
+# This is important for validation: do these parameters make clinical sense?
+# For example, we'd expect to see treatment costs, key hazard ratios, and
+# important utilities in the top 10 for an oncology model
+# Health economic value: Allows face validity check of results
+print("Top 10 Most Influential Parameters:")
+print(top10_parameters)
+
+# Example output might be:
+# [1] "Bevacizumab Cost"
+# [2] "HR First - Second Line Bev"
+# [3] "Folfox Cost"
+# [4] "Prob First - Second Line SoC"
+# [5] "Utility First Line"
+# ... etc
+
+# ============================================================================
+# STEP 3: FILTER OWSA RESULTS TO TOP 10 PARAMETERS ONLY
+# ============================================================================
+#
+# HEALTH ECONOMIC PURPOSE:
+# -----------------------------------------------------------------------------
+# We now create a subset of our OWSA results that includes only the top 10
+# most influential parameters. This filtered dataset will be used to generate
+# the simplified tornado plot.
+#
+# This subset maintains all the detail of the original OWSA (100 samples per
+# parameter showing how ICER changes), but focuses only on the parameters that
+# matter most for the cost-effectiveness decision.
+#
+# MODELING APPROACH:
+# -----------------------------------------------------------------------------
+# We use dplyr's filter() function to keep only rows where the parameter name
+# is in our top10_parameters vector.
+
+# Filter the DSAICER data frame to include only top 10 parameters
+# The filter function keeps rows that meet a specified condition
+# The %in% operator checks if a value is in a vector
+# Health economic interpretation: Focusing our analysis on key uncertainties
+DSAICER_top10 <- DSAICER %>%
+
+  # Keep only rows where the parameter column matches one of our top 10
+  # The %in% operator returns TRUE if parameter is in top10_parameters vector
+  # This will keep all 100 samples for each of the 10 parameters
+  # Health economic interpretation: Retaining full detail for influential parameters
+  # Modeling interpretation: Subsetting the data frame for focused visualization
+  filter(parameter %in% top10_parameters)
+
+# Verify we have the expected number of rows
+# With 10 parameters and 100 samples each (nsamp=100), we expect 1000 rows
+# This is a data quality check to ensure our filtering worked correctly
+# Health economic value: Ensuring data integrity before visualization
+# Modeling value: Catching any potential errors in the filtering process
+print(paste("Number of rows in DSAICER_top10:", nrow(DSAICER_top10)))
+print(paste("Expected rows: 10 parameters × 100 samples = 1000"))
+
+# If the numbers don't match, something went wrong in our filtering
+# This could indicate:
+# - Fewer than 10 unique parameters in the original OWSA (unlikely)
+# - The parameter names don't match between our filter and the data
+# - Some other data processing error
+
+# ============================================================================
+# STEP 4: DETERMINE SENSIBLE AXIS LIMITS FOR THE TORNADO PLOT
+# ============================================================================
+#
+# HEALTH ECONOMIC RATIONALE FOR CUSTOM AXIS LIMITS:
+# -----------------------------------------------------------------------------
+# Appropriate axis scaling is critical for accurate interpretation of
+# sensitivity analysis results. Poorly chosen limits can:
+#
+# MISLEAD: Too narrow limits exaggerate small differences
+# OBSCURE: Too wide limits make real differences appear trivial
+# DISTORT: Asymmetric limits can create false impressions of direction
+#
+# In health economic reporting, we must ensure that:
+# - The magnitude of parameter influence is accurately represented
+# - Readers can make valid comparisons between parameters
+# - The plot is not manipulated (intentionally or not) to support a conclusion
+# - There's enough context (white space) to see the data clearly
+#
+# BEST PRACTICE APPROACH:
+# -----------------------------------------------------------------------------
+# We calculate axis limits based on the ACTUAL data range for our top 10
+# parameters, then add a small buffer for visual clarity:
+#
+# 1. Find the minimum ICER value across all top 10 parameters
+# 2. Find the maximum ICER value across all top 10 parameters
+# 3. Calculate the range = max - min
+# 4. Add 5% buffer on each side (standard practice in data visualization)
+#
+# This ensures:
+# - All data points are visible (no truncation)
+# - Differences are accurately portrayed (no distortion)
+# - The plot is readable (bars don't touch axis edges)
+# - The approach is defensible and reproducible
+#
+# MODELING APPROACH:
+# -----------------------------------------------------------------------------
+# We use R's min() and max() functions on the outcome_val column of our
+# filtered dataset, then apply simple arithmetic to calculate buffered limits.
+
+# Calculate the minimum ICER value in the top 10 parameter subset
+# This is the lowest ICER achieved by any parameter at any point in its range
+# Health economic interpretation: The most optimistic ICER under parameter uncertainty
+# Modeling interpretation: The left edge of our tornado plot data
+min_icer_top10 <- min(DSAICER_top10$outcome_val)
+
+# Calculate the maximum ICER value in the top 10 parameter subset
+# This is the highest ICER achieved by any parameter at any point in its range
+# Health economic interpretation: The most pessimistic ICER under parameter uncertainty
+# Modeling interpretation: The right edge of our tornado plot data
+max_icer_top10 <- max(DSAICER_top10$outcome_val)
+
+# Calculate the 5% buffer amount
+# Buffer = 5% of the total range
+# This provides breathing room so bars don't touch the axis edges
+# 5% is a standard convention in data visualization - small enough not to distort,
+# large enough to provide visual clarity
+# Health economic interpretation: Maintaining visual honesty in reporting
+# Modeling interpretation: Improving plot aesthetics without changing the message
+buffer <- 0.05 * (max_icer_top10 - min_icer_top10)
+
+# Create the axis limits by subtracting buffer from min and adding to max
+# This creates a two-element vector: c(lower_limit, upper_limit)
+# The c() function combines values into a vector
+# Health economic interpretation: Setting fair, data-driven axis bounds
+# Modeling interpretation: Defining the ylim parameter for owsa_tornado
+# Note: "ylim" is the parameter name in owsa_tornado, but due to horizontal
+# orientation, this actually controls the ICER axis (which appears horizontal/x)
+ylim_top10 <- c(min_icer_top10 - buffer, max_icer_top10 + buffer)
+
+# Display the calculated limits for review
+# This transparency is important for reproducibility and validation
+# Reviewers or users can verify that our axis choices are appropriate
+# Health economic value: Transparent reporting of visualization decisions
+# Practical value: Helps identify if limits look unreasonable (e.g., negative ICER)
+print(paste("ICER range for top 10:", round(min_icer_top10), "to", round(max_icer_top10)))
+print(paste("Axis limits with 5% buffer:", round(ylim_top10[1]), "to", round(ylim_top10[2])))
+
+# Example output might be:
+# "ICER range for top 10: 125000 to 215000"
+# "Axis limits with 5% buffer: 120500 to 219500"
+
+# ============================================================================
+# STEP 5: CREATE TORNADO PLOT FOR TOP 10 PARAMETERS
+# ============================================================================
+#
+# HEALTH ECONOMIC PURPOSE OF TORNADO PLOTS:
+# -----------------------------------------------------------------------------
+# Tornado plots (also called tornado diagrams) are a standard tool in health
+# economic evaluation for visualizing one-way sensitivity analysis results.
+#
+# KEY FEATURES OF TORNADO PLOTS:
+# 1. Bars are sorted by magnitude of impact (creating a "tornado" shape)
+# 2. Each bar shows the range of outcome values for one parameter
+# 3. Bar length represents the parameter's influence on the outcome
+# 4. Allows quick visual comparison of parameter importance
+#
+# INTERPRETATION GUIDANCE:
+# - LONG BARS = high-impact parameters that strongly influence cost-effectiveness
+# - SHORT BARS = low-impact parameters with minimal effect on the decision
+# - Parameters at the top (longest bars) are research priorities
+# - If bars cross a threshold (e.g., willingness-to-pay), the parameter can
+#   change the cost-effectiveness decision
+#
+# DAMPACK'S OWSA_TORNADO FUNCTION:
+# -----------------------------------------------------------------------------
+# The owsa_tornado() function from the dampack package creates publication-quality
+# tornado plots following health economic best practices. It automatically:
+# - Sorts parameters by impact (largest at top)
+# - Creates horizontal bars showing min-to-max range
+# - Labels parameters clearly
+# - Allows customization of text size, colors, axis limits
+#
+# FUNCTION PARAMETERS WE'RE USING:
+# - owsa: The OWSA results data frame (we use our top 10 subset)
+# - txtsize: Base text size for labels (11 pt is readable)
+# - ylim: Axis limits (our calculated limits with 5% buffer)
+#
+# Note on axis naming: Due to horizontal orientation, "ylim" in the function
+# actually controls the ICER axis (which displays horizontally).
+
+# Load the dampack package if not already loaded
+# dampack provides functions for decision-analytic modeling
+# Health economic value: Standardized tools for CEA visualization
+library(dampack)
+
+# Create the tornado plot using the owsa_tornado function
+# This generates a ggplot2 object that we can further customize
+# Health economic interpretation: Visualizing parameter influence for communication
+tornado_plot_top10 <- owsa_tornado(
+
+  # Specify the OWSA results to plot
+  # We use our filtered dataset with only top 10 parameters
+  # This ensures the plot is focused and readable
+  # Health economic interpretation: Showing only the most influential uncertainties
+  # Modeling interpretation: Passing the subsetted data frame to the plotting function
+  owsa = DSAICER_top10,
+
+  # Set the base text size for parameter labels
+  # 11 points is large enough to read clearly but small enough to fit 10 labels
+  # This affects parameter names, axis labels, and tick marks
+  # Health economic interpretation: Ensuring accessibility of visualization
+  # Practical consideration: Must balance readability with space constraints
+  txtsize = 11,
+
+  # Apply our calculated axis limits (with 5% buffer)
+  # This ensures appropriate scaling without excessive white space
+  # ylim is a two-element vector: c(minimum, maximum)
+  # Health economic interpretation: Fair, data-driven axis bounds
+  # Modeling interpretation: Controlling the range of the ICER axis
+  # Important: In owsa_tornado's horizontal layout, ylim controls the outcome (ICER)
+  # axis, even though it appears horizontally on the page
+  ylim = ylim_top10
+)
+
+# At this point, tornado_plot_top10 is a ggplot object
+# We can modify it further using standard ggplot2 functions
+# This is one of the strengths of dampack - it returns standard ggplot objects
+# that can be customized as needed
+
+# ============================================================================
+# STEP 6: CUSTOMIZE PLOT LABELS AND TITLE
+# ============================================================================
+#
+# HEALTH ECONOMIC IMPORTANCE OF CLEAR LABELING:
+# -----------------------------------------------------------------------------
+# In health economic reporting, figures must be self-explanatory and accessible.
+# Good practice requires:
+#
+# 1. CLEAR AXIS LABELS: Readers should immediately know what is being plotted
+#    - Not just "Outcome" but "ICER (€ per QALY)"
+#    - Include units (€, QALY, years, etc.)
+#
+# 2. DESCRIPTIVE TITLES: The title should indicate:
+#    - What type of analysis this is (tornado plot / one-way sensitivity)
+#    - What it shows (top 10 parameters only)
+#    - Which country/population it applies to
+#
+# 3. PROFESSIONAL FORMATTING: Center-aligned titles, appropriate spacing
+#
+# GGPLOT2 CUSTOMIZATION:
+# -----------------------------------------------------------------------------
+# Since owsa_tornado returns a ggplot object, we can use standard ggplot2
+# functions to customize it:
+# - labs() for labels and titles
+# - theme() for formatting and positioning
+# - + operator to add layers to the plot
+
+# Load ggplot2 if not already loaded
+# ggplot2 is the graphics package underlying dampack's plots
+# Health economic value: Industry-standard, publication-quality graphics
+library(ggplot2)
+
+# Add a clear axis label for the ICER
+# In owsa_tornado's horizontal layout:
+# - Parameters are on the y-axis (vertical, on the left)
+# - ICER values are on the x-axis (horizontal, at the bottom)
+# Therefore we use labs(x = ...) to label the ICER axis
+# Health economic interpretation: Making the outcome variable explicit
+# Including units (€ per QALY) is critical for interpretation
+tornado_plot_top10 <- tornado_plot_top10 +
+
+  # The labs function adds or modifies labels
+  # x = sets the x-axis label (this is the ICER axis in horizontal tornado plots)
+  # We include units (€ per QALY) for clarity
+  # Health economic best practice: Always include units in axis labels
+  # Modeling interpretation: Labeling the horizontal axis
+  labs(x = "ICER (€ per QALY)")
+
+# Create a descriptive title that includes:
+# 1. What it is: "Tornado Plot"
+# 2. What it shows: "Top 10 Most Influential Parameters"
+# 3. Context: Country name
+# The paste function concatenates strings
+# country_name[1] extracts the first element of the country_name vector
+# We use [1] to ensure we get a single value, not a vector
+# Health economic interpretation: Providing full context for the analysis
+# Practical value: Allows readers to immediately know what they're looking at
+plot_title_top10 <- paste(
+  "Tornado Plot - Top 10 Most Influential Parameters (",
+  country_name[1],
+  ")",
+  sep = ""  # sep="" means no separator between the pasted elements
+)
+
+# Add the title to the plot and center it
+# Also adjust the positioning of axis labels
+# The ggtitle function adds a title
+# The theme function controls non-data elements of the plot
+tornado_plot_top10 <- tornado_plot_top10 +
+
+  # Add the title we created
+  # ggtitle is a shortcut for labs(title = ...)
+  # Health economic interpretation: Making the plot self-contained
+  ggtitle(plot_title_top10) +
+
+  # Customize the appearance using theme
+  # theme controls all non-data display (text, backgrounds, spacing, etc.)
+  theme(
+    # Center the title horizontally
+    # plot.title refers to the main title we just added
+    # element_text allows us to modify text properties
+    # hjust = 0.5 means horizontal justification at 50% (centered)
+    # hjust = 0 would be left-aligned, hjust = 1 would be right-aligned
+    # Health economic best practice: Centered titles are standard in publications
+    plot.title = element_text(hjust = 0.5),
+
+    # Adjust the vertical position of the x-axis label
+    # axis.title.x refers to the x-axis label ("ICER (€ per QALY)")
+    # vjust controls vertical justification (positioning)
+    # vjust = 0.25 moves it slightly up from default position
+    # This creates better visual spacing between the axis and the label
+    # Health economic consideration: Professional appearance for publication
+    axis.title.x = element_text(vjust = 0.25)
+  )
+
+# At this point, tornado_plot_top10 is fully labeled and formatted
+# It shows:
+# - Top 10 parameters only (readable, focused)
+# - Clear ICER axis label with units
+# - Descriptive title with country context
+# - Professional formatting
+
+# ============================================================================
+# STEP 7: ADD FOOTNOTE WITH ABBREVIATIONS
+# ============================================================================
+#
+# HEALTH ECONOMIC RATIONALE FOR ABBREVIATION FOOTNOTES:
+# -----------------------------------------------------------------------------
+# In health economic models, we often use abbreviations for:
+# - Clinical terms (SoC = Standard of Care)
+# - Statistical concepts (HR = Hazard Ratio)
+# - Treatment names (Bev = Bevacizumab)
+# - Model states (PFS = Progression-Free Survival)
+#
+# ACCESSIBILITY REQUIREMENT:
+# Best practice in scientific communication requires that:
+# 1. Figures should be self-contained (understandable without reading the full paper)
+# 2. All abbreviations should be defined where they are used
+# 3. Readers from different backgrounds should be able to interpret the figure
+#
+# This is particularly important for:
+# - Journal reviewers who may skim the paper
+# - Policy makers who may only look at key figures
+# - International readers who may not know country-specific abbreviations
+# - Interdisciplinary audiences (clinicians, economists, statisticians)
+#
+# GGPLOT2 CAPTION FUNCTIONALITY:
+# -----------------------------------------------------------------------------
+# We use the labs() function to add a caption (footnote) at the bottom of the plot.
+# The theme() function controls the appearance and positioning of this caption.
+
+# Create a text string explaining the key abbreviations
+# We use paste to concatenate multiple lines of text
+# The \n character creates a line break (new line)
+# Health economic interpretation: Making the plot accessible to all readers
+# Practical consideration: Include only abbreviations that actually appear in the plot
+abbreviations_caption <- paste(
+  # First line: Define the most important abbreviations
+  # These are the clinical and statistical terms likely to appear in parameter names
+  "Abbreviations: HR = Hazard Ratio; Prob = Probability; SoC = Standard of Care;",
+
+  # Second line: Define treatment-specific abbreviations
+  "Exp = Experimental (Bevacizumab); Bev = Bevacizumab.",
+
+  # Third line: Explain the selection criterion and why only 10 are shown
+  # This adds transparency about our methodology
+  # The \n at the start creates a line break for visual separation
+  "\nParameters ranked by absolute impact on ICER. Only top 10 shown for clarity."
+)
+
+# Add the caption to the plot and control its formatting
+# The labs function can add multiple types of labels including captions
+# The theme function controls the caption's appearance
+tornado_plot_top10 <- tornado_plot_top10 +
+
+  # Add the caption using the labs function
+  # caption = sets the footnote text at the bottom of the plot
+  # Health economic interpretation: Ensuring self-contained, accessible figures
+  labs(caption = abbreviations_caption) +
+
+  # Customize the caption appearance using theme
+  theme(
+    # Control the text properties of the caption
+    # plot.caption refers to the caption we just added
+    # element_text allows us to modify text properties
+    plot.caption = element_text(
+      # Left-align the caption text
+      # hjust = 0 means horizontal justification at 0% (left edge)
+      # This is standard for footnotes - they're typically left-aligned
+      # Health economic convention: Footnotes are left-aligned in academic publications
+      hjust = 0,
+
+      # Use smaller text size for the caption
+      # size = 8 is smaller than the main plot text (which is 11)
+      # This visually distinguishes the footnote from the main content
+      # Standard practice: Footnotes are smaller than body text
+      size = 8
+    ),
+
+    # Control where the caption is positioned
+    # plot.caption.position can be "panel" (within plotting area) or "plot" (below everything)
+    # "plot" means the caption appears below the entire plot including axes
+    # This is standard for figure footnotes in publications
+    # Health economic best practice: Captions go at the bottom, outside the plot area
+    plot.caption.position = "plot"
+  )
+
+# Now tornado_plot_top10 is complete with:
+# - Top 10 parameters only
+# - Clear axis labels with units
+# - Descriptive title with country
+# - Footnote explaining abbreviations
+# - Professional formatting throughout
+
+# ============================================================================
+# STEP 8: CREATE OUTPUT FOLDER AND SAVE THE PLOT
+# ============================================================================
+#
+# HEALTH ECONOMIC RATIONALE FOR ORGANIZED OUTPUT STRUCTURE:
+# -----------------------------------------------------------------------------
+# In health economic modeling projects, organized file management is critical for:
+#
+# 1. REPRODUCIBILITY: Others must be able to find and use your outputs
+# 2. VERSION CONTROL: Keep model outputs separate from code and inputs
+# 3. COLLABORATION: Team members need a clear, consistent folder structure
+# 4. REGULATORY SUBMISSION: Agencies require well-organized supporting materials
+# 5. ARCHIVING: Outputs must be findable months or years later
+#
+# BEST PRACTICE FOLDER STRUCTURE:
+# - /code or /R: R scripts and Rmd files
+# - /data or /inputs: Input data files
+# - /outputs or /results: Generated outputs (plots, tables, CSVs)
+# - /docs: Documentation and manuscripts
+#
+# By saving outputs to an "outputs/" folder, we:
+# - Keep the repository root clean
+# - Make it easy to find all results in one place
+# - Enable .gitignore rules to exclude outputs if needed
+# - Follow standard project organization conventions
+#
+# MODELING APPROACH:
+# -----------------------------------------------------------------------------
+# We use base R's file system functions to:
+# 1. Check if the outputs/ folder exists
+# 2. Create it if it doesn't exist
+# 3. Construct the full file path for our plot
+# 4. Save the plot with ggsave at high resolution
+
+# Check if the "outputs" folder exists, and create it if not
+# dir.exists() returns TRUE if the folder exists, FALSE otherwise
+# The ! operator means NOT, so !dir.exists() means "if NOT exists"
+# This is a safe approach - it won't error if the folder already exists
+# Health economic value: Ensuring reproducibility across different environments
+if (!dir.exists("outputs")) {
+
+  # Create the outputs folder
+  # dir.create() creates a new folder
+  # recursive = TRUE means it will create parent folders if needed
+  # For example, if we wanted "outputs/plots/tornado", it would create all levels
+  # Health economic interpretation: Setting up organized output structure
+  # Modeling interpretation: Ensuring the target folder exists before saving
+  dir.create("outputs", recursive = TRUE)
+
+  # Print a message confirming folder creation
+  # This appears in the console for transparency
+  # Health economic value: Transparent reporting of file operations
+  print("Created 'outputs' folder for results")
+}
+
+# Construct the full file path for our plot
+# file.path() joins path components with the correct separator for the OS
+# This is more robust than paste() because it handles Windows vs. Unix paths
+# paste0() concatenates strings with no separator
+# tolower() converts the country name to lowercase for consistent filenames
+# Health economic interpretation: Creating organized, findable output files
+# Practical value: Lowercase filenames avoid case-sensitivity issues
+filename_top10 <- file.path(
+  # First argument: the folder name
+  # All files will be saved in the "outputs" folder
+  "outputs",
+
+  # Second argument: the filename
+  # We construct this dynamically using the country name
+  # paste0 concatenates without spaces: "tornado_top10_ireland.png"
+  # tolower ensures consistent lowercase filenames (ireland, germany, spain)
+  # Health economic best practice: Descriptive filenames that indicate content
+  paste0("tornado_top10_", tolower(country_name[1]), ".png")
+)
+
+# Display the filename for confirmation
+# This transparency helps with debugging and reproducibility
+# Users can see exactly where the file will be saved
+# Health economic value: Transparent reporting of outputs
+print(paste("Saving top 10 tornado plot to:", filename_top10))
+
+# Save the plot to a PNG file
+# ggsave is ggplot2's function for saving plots to files
+# It handles multiple formats (PNG, PDF, JPEG, etc.) and resolution settings
+# Health economic importance: Publication-quality outputs for manuscripts
+ggsave(
+  # First argument: the filename (including path)
+  # This is where the file will be saved
+  # Example: "outputs/tornado_top10_ireland.png"
+  filename_top10,
+
+  # Specify which plot object to save
+  # plot = identifies which ggplot object to export
+  # We use our fully customized tornado_plot_top10 object
+  # Health economic interpretation: Saving our publication-ready visualization
+  plot = tornado_plot_top10,
+
+  # Set the width of the plot in inches
+  # 8 inches is standard for a full-width figure in a two-column journal
+  # This provides enough space for parameter names and the tornado bars
+  # Health economic consideration: Standard figure width for publications
+  width = 8,
+
+  # Set the height of the plot in inches
+  # 6 inches accommodates 10 parameter labels with good spacing
+  # This is taller than our previous 4-inch plots because we have a caption
+  # The extra height ensures the caption is readable and not cramped
+  # Health economic consideration: Adequate space for all elements
+  height = 6,
+
+  # Set the resolution in dots per inch (DPI)
+  # 600 DPI is high resolution, suitable for publication
+  # Journal requirements typically range from 300-600 DPI
+  # Higher DPI means sharper text and clearer graphics
+  # Health economic best practice: Publication-quality resolution
+  # Practical consideration: 600 DPI ensures acceptance by any journal
+  dpi = 600
+)
+
+# Close any open graphics devices
+# R can have multiple graphics devices open simultaneously
+# dev.list() returns a list of open devices (NULL if none)
+# !is.null() checks if there are any open devices
+# dev.off() closes the current device
+# This while loop closes all open devices to free memory
+# Health economic value: Clean environment for reproducibility
+# Practical value: Prevents graphics device errors in subsequent plots
+while (!is.null(dev.list())) dev.off()
+
+# Print confirmation message
+# This provides feedback that the save operation completed
+# Health economic value: Transparent workflow documentation
+print(paste("Top 10 tornado plot saved successfully as:", filename_top10))
+
+# At this point we have:
+# - Created outputs/ folder if needed
+# - Saved high-resolution PNG of top 10 tornado plot
+# - Filename: outputs/tornado_top10_<country>.png (e.g., outputs/tornado_top10_ireland.png)
+
+# ============================================================================
+# STEP 9: CREATE VERSION WITHOUT AXIS LIMITS (FOR COMPARISON)
+# ============================================================================
+#
+# HEALTH ECONOMIC RATIONALE FOR CREATING AN "UNLIMITED" VERSION:
+# -----------------------------------------------------------------------------
+# In data visualization, axis limits can significantly affect interpretation.
+# While we've calculated sensible limits based on the data, it's good practice
+# to also create a version without custom limits to ensure we haven't:
+#
+# 1. HIDDEN IMPORTANT CONTEXT: Custom limits might crop out relevant range
+# 2. DISTORTED COMPARISONS: Limited axes might exaggerate or minimize differences
+# 3. INTRODUCED BIAS: Axis choices could (even unintentionally) favor a conclusion
+#
+# By creating both versions, we:
+# - Can visually compare them to verify our limits are appropriate
+# - Provide transparency in our visualization choices
+# - Have both options available for different presentation contexts
+# - Follow best practices in data visualization ethics
+#
+# PRACTICAL USE CASES:
+# - LIMITED VERSION: Use in publications where space is constrained and you want
+#   to focus reader attention on the relevant range
+# - UNLIMITED VERSION: Use in appendices, technical reports, or when reviewers
+#   request to see the full range
+#
+# MODELING APPROACH:
+# -----------------------------------------------------------------------------
+# We create a second tornado plot identical to the first, except we omit the
+# ylim parameter, allowing owsa_tornado to automatically determine axis limits.
+
+# Create another tornado plot without custom axis limits
+# This is identical to our previous plot except we don't specify ylim
+# The owsa_tornado function will automatically determine appropriate limits
+# Health economic interpretation: Transparency in visualization choices
+# Modeling interpretation: Allowing automatic axis scaling for comparison
+unlimited_tornado_plot_top10 <- owsa_tornado(
+
+  # Use the same filtered data (top 10 parameters only)
+  # This ensures we're comparing apples to apples - same parameters, different scaling
+  # Health economic interpretation: Consistent data, different presentation
+  owsa = DSAICER_top10,
+
+  # Use the same text size for consistency
+  # This ensures any visual differences are due to axis scaling, not text size
+  # Health economic best practice: Control variables when comparing visualizations
+  txtsize = 11
+
+  # Note: No ylim specified here - this is the key difference
+  # owsa_tornado will automatically choose limits based on the data
+  # Typically this will be slightly wider than our custom limits
+  # Health economic interpretation: Letting the software choose "neutral" limits
+)
+
+# Add the same axis label
+# We want everything to be identical except the axis limits
+# This allows fair comparison between the two versions
+# Health economic interpretation: Consistent labeling for comparability
+unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
+  # Label the x-axis as ICER with units
+  # Identical to the limited version
+  labs(x = "ICER (€ per QALY)")
+
+# Create a title indicating this is the unlimited scale version
+# We add "Unlimited Scale" to the title to distinguish it from the limited version
+# This makes it clear which version is which when comparing files
+# Health economic interpretation: Clear labeling of visualization variants
+plot_title_unlimited_top10 <- paste(
+  "Tornado Plot - Top 10 Most Influential Parameters (",
+  country_name[1],
+  ") - Unlimited Scale",  # This is the key addition
+  sep = ""
+)
+
+# Add the title and apply the same formatting
+# Everything should match the limited version except the title text
+# Health economic best practice: Consistent formatting across related figures
+unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
+  # Add the modified title
+  ggtitle(plot_title_unlimited_top10) +
+  # Apply identical theme settings
+  theme(
+    # Center the title
+    plot.title = element_text(hjust = 0.5),
+    # Adjust x-axis label position
+    axis.title.x = element_text(vjust = 0.25)
+  )
+
+# Add the same abbreviations caption
+# The footnote should be identical to the limited version
+# This ensures both plots are equally self-explanatory
+# Health economic interpretation: Consistent accessibility across variants
+unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
+  # Use the same caption text we defined earlier
+  labs(caption = abbreviations_caption) +
+  # Use the same caption formatting
+  theme(
+    # Left-aligned, smaller text
+    plot.caption = element_text(hjust = 0, size = 8),
+    # Positioned below the plot
+    plot.caption.position = "plot"
+  )
+
+# Construct the filename for the unlimited version
+# We add "unlimited" to the filename to distinguish it
+# This creates filenames like: outputs/tornado_top10_unlimited_ireland.png
+# Health economic value: Clear, organized file naming
+file_unlimited_top10 <- file.path(
+  # Save in the same outputs folder
+  "outputs",
+  # Filename includes "unlimited" to indicate the variant
+  # This makes it easy to distinguish from the limited version
+  paste0("tornado_top10_unlimited_", tolower(country_name[1]), ".png")
+)
+
+# Display the filename for confirmation
+# Transparency in file operations
+print(paste("Saving unlimited top 10 tornado plot to:", file_unlimited_top10))
+
+# Save the unlimited version with the same dimensions and resolution
+# All save settings should match the limited version for fair comparison
+# Health economic best practice: Consistent output format across variants
+ggsave(
+  # Save to the unlimited filename
+  file_unlimited_top10,
+
+  # Save the unlimited version plot object
+  plot = unlimited_tornado_plot_top10,
+
+  # Same width as the limited version (8 inches)
+  # This ensures the plots are directly comparable
+  width = 8,
+
+  # Same height as the limited version (6 inches)
+  # Consistent dimensions allow side-by-side comparison
+  height = 6,
+
+  # Same high resolution (600 DPI)
+  # Both versions are publication-quality
+  dpi = 600
+)
+
+# Close graphics devices
+# Clean up after saving
+while (!is.null(dev.list())) dev.off()
+
+# Print confirmation
+# Confirm successful save operation
+print(paste("Unlimited top 10 tornado plot saved successfully as:", file_unlimited_top10))
+
+# ============================================================================
+# SUMMARY AND INTERPRETATION NOTES
+# ============================================================================
+#
+# OUTPUTS GENERATED BY THIS SECTION:
+# -----------------------------------------------------------------------------
+# At this point, you should have FOUR tornado plot files in the outputs/ folder:
+#
+# From previous sections (full set of parameters):
+# 1. Tornado_Diagram_<Country>.png - All parameters with axis limits
+# 2. Unlimited_Tornado_Diagram_<Country>.png - All parameters without limits
+#
+# From this section (top 10 parameters only):
+# 3. tornado_top10_<country>.png - Top 10 only with calculated axis limits
+# 4. tornado_top10_unlimited_<country>.png - Top 10 only without limits
+#
+# WHICH VERSION TO USE:
+# -----------------------------------------------------------------------------
+# For PUBLICATION or PRESENTATION, typically use:
+#   → tornado_top10_<country>.png (version #3)
+#
+#   This provides:
+#   - Clear, focused visualization (not cluttered)
+#   - Appropriate axis scaling (with 5% buffer)
+#   - Self-contained with abbreviations footnote
+#   - Publication-quality resolution (600 DPI)
+#
+# For APPENDICES or TECHNICAL REPORTS:
+#   → Tornado_Diagram_<Country>.png (version #1) or
+#   → tornado_top10_unlimited_<country>.png (version #4)
+#
+#   These provide:
+#   - Full detail (all parameters or unlimited scale)
+#   - Transparency and completeness
+#   - Context for the simplified versions
+#
+# For INTERNAL VALIDATION:
+#   → Compare versions #3 and #4 to ensure axis limits aren't distorting
+#   → Compare across countries to see if the same parameters are influential
+#
+# NEXT STEPS FOR HEALTH ECONOMIC ANALYSIS:
+# -----------------------------------------------------------------------------
+# After generating these plots, you should:
+#
+# 1. REVIEW TOP 10 PARAMETERS FOR FACE VALIDITY:
+#    - Do these parameters make clinical and economic sense?
+#    - Are key treatment costs included? (Expected: yes)
+#    - Are important survival parameters included? (Expected: yes)
+#    - Are utilities included if they're uncertain? (Possible)
+#
+# 2. COMPARE ACROSS COUNTRIES:
+#    - Are the same parameters influential in Ireland, Germany, and Spain?
+#    - If different parameters matter, why? (Different costs? Different thresholds?)
+#    - This can reveal whether conclusions are robust across settings
+#
+# 3. IDENTIFY RESEARCH PRIORITIES:
+#    - High-impact parameters are candidates for additional data collection
+#    - Consider whether reducing uncertainty in these parameters is feasible
+#    - Prioritize parameters that could change the cost-effectiveness decision
+#
+# 4. CROSS-REFERENCE WITH PSA RESULTS:
+#    - The most influential parameters in OWSA should also show wide distributions in PSA
+#    - If PSA shows a different set of important parameters, investigate why
+#    - This comparison validates the consistency of your uncertainty analysis
+#
+# 5. CONSIDER THRESHOLD ANALYSIS:
+#    - For the most influential cost parameters: at what price would the decision change?
+#    - For the most influential clinical parameters: what efficacy would be needed?
+#    - Threshold analysis can provide concrete targets for decision-makers
+#
+# 6. PREPARE FOR VALUE OF INFORMATION ANALYSIS (OPTIONAL):
+#    - The top 10 parameters are candidates for EVPI (Expected Value of Perfect Information)
+#    - EVPI quantifies the value of eliminating uncertainty in each parameter
+#    - This can justify and prioritize additional research investments
+#
+# REPRODUCIBILITY INSTRUCTIONS:
+# -----------------------------------------------------------------------------
+# To generate plots for all three countries:
+#
+# STEP A: Run for Ireland
+#   1. In the country selection section, uncomment the Ireland block
+#   2. Comment out the Germany and Spain blocks
+#   3. Knit the document (or run all chunks through this one)
+#   4. Check outputs/tornado_top10_ireland.png
+#
+# STEP B: Run for Germany
+#   1. In the country selection section, uncomment the Germany block
+#   2. Comment out the Ireland and Spain blocks
+#   3. Knit the document (or run all chunks through this one)
+#   4. Check outputs/tornado_top10_germany.png
+#
+# STEP C: Run for Spain
+#   1. In the country selection section, uncomment the Spain block
+#   2. Comment out the Ireland and Germany blocks
+#   3. Knit the document (or run all chunks through this one)
+#   4. Check outputs/tornado_top10_spain.png
+#
+# VERIFICATION CHECKLIST:
+# -----------------------------------------------------------------------------
+# After running for all three countries, verify:
+#
+# □ Six files exist in outputs/ (2 per country: limited and unlimited)
+# □ All plots show exactly 10 parameters
+# □ Parameters are sorted by impact (longest bars at top)
+# □ Axis labels are clear and include units
+# □ Titles include country name
+# □ Abbreviations footnote is present and legible
+# □ Resolution is high (600 DPI - text should be very sharp)
+# □ No truncation or overflow of labels
+# □ The top 10 parameters make clinical/economic sense
+#
+# TROUBLESHOOTING:
+# -----------------------------------------------------------------------------
+# If plots don't generate or look wrong:
+#
+# PROBLEM: "Error: object 'DSAICER' not found"
+# SOLUTION: Run the OWSA section first (run_owsa_det must complete)
+#
+# PROBLEM: Fewer than 10 parameters in the plot
+# SOLUTION: Check that at least 10 parameters were included in df_params_OWSA
+#
+# PROBLEM: Axis limits look wrong or data is cut off
+# SOLUTION: Check the console output showing min/max ICER and calculated limits
+#
+# PROBLEM: Parameter names are truncated
+# SOLUTION: Increase plot width in ggsave (e.g., width = 10 instead of 8)
+#
+# PROBLEM: Text is blurry in the saved PNG
+# SOLUTION: Check that dpi = 600 (not a lower value)
+#
+# PROBLEM: Wrong country name in filename
+# SOLUTION: Verify the correct country block is uncommented before running
+#
+# END OF SECTION
+# ============================================================================
 
 ```
 
