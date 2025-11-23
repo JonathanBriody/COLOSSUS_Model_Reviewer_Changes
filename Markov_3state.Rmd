@@ -383,12 +383,87 @@ cat("\nPD-like states (n =", nrow(mcrc_pd_studies), "):\n")
 print(mcrc_pd_studies[, c("study_id", "line_or_state", "mean_utility")])
 cat("\n")
 
+# STEP 1B: DIAGNOSTIC - Check for NA utilities in matched studies
+# ----------------------------------------------------------------
+# This validation step checks if any matched studies have NA utility values,
+# which would cause the mean() calculation to fail or return NA.
+
+# For PFS-like studies
+pfs_na_count <- sum(is.na(mcrc_pfs_studies$mean_utility))
+if (pfs_na_count > 0) {
+  cat("\n!!! WARNING: Found", pfs_na_count, "PFS-like studies with NA utilities !!!\n")
+  cat("These studies will be excluded from mean calculation:\n")
+  print(mcrc_pfs_studies[is.na(mcrc_pfs_studies$mean_utility),
+                         c("study_id", "line_or_state", "mean_utility")])
+  cat("\n")
+}
+
+# For PD-like studies
+pd_na_count <- sum(is.na(mcrc_pd_studies$mean_utility))
+if (pd_na_count > 0) {
+  cat("\n!!! WARNING: Found", pd_na_count, "PD-like studies with NA utilities !!!\n")
+  cat("These studies will be excluded from mean calculation:\n")
+  print(mcrc_pd_studies[is.na(mcrc_pd_studies$mean_utility),
+                        c("study_id", "line_or_state", "mean_utility")])
+  cat("\n")
+}
+
+# STEP 1C: VALIDATION - Ensure we have valid data to work with
+# -------------------------------------------------------------
+# Check that we have at least one non-NA utility value for each category
+
+pfs_valid_count <- sum(!is.na(mcrc_pfs_studies$mean_utility))
+pd_valid_count <- sum(!is.na(mcrc_pd_studies$mean_utility))
+
+if (pfs_valid_count == 0) {
+  stop(paste0(
+    "\n=== FATAL ERROR: No valid PFS-like utilities found ===\n\n",
+    "PROBLEM:\n",
+    "  Found ", nrow(mcrc_pfs_studies), " PFS-like studies, but ALL have NA utilities.\n\n",
+    "LIKELY CAUSES:\n",
+    "  1. CSV file has non-numeric characters in mean_utility column (e.g., '~0.45')\n",
+    "  2. R read the column as 'character' type instead of 'numeric'\n",
+    "  3. Encoding issues with special characters in CSV file\n\n",
+    "SOLUTIONS:\n",
+    "  1. Open data/mCRC_Utility_Evidence_TableB.csv\n",
+    "  2. Check that mean_utility column contains only numeric values\n",
+    "  3. Remove any non-numeric characters (like ~, ≈, etc.)\n",
+    "  4. Ensure the CSV is saved with UTF-8 encoding\n",
+    "  5. Re-run this chunk\n\n",
+    "MATCHED STUDIES (with NA utilities):\n"
+  ))
+}
+
+if (pd_valid_count == 0) {
+  stop(paste0(
+    "\n=== FATAL ERROR: No valid PD-like utilities found ===\n\n",
+    "PROBLEM:\n",
+    "  Found ", nrow(mcrc_pd_studies), " PD-like studies, but ALL have NA utilities.\n\n",
+    "LIKELY CAUSES:\n",
+    "  1. CSV file has non-numeric characters in mean_utility column (e.g., '~0.45')\n",
+    "  2. R read the column as 'character' type instead of 'numeric'\n",
+    "  3. Encoding issues with special characters in CSV file\n\n",
+    "SOLUTIONS:\n",
+    "  1. Open data/mCRC_Utility_Evidence_TableB.csv\n",
+    "  2. Check that mean_utility column contains only numeric values\n",
+    "  3. Remove any non-numeric characters (like ~, ≈, etc.)\n",
+    "  4. Ensure the CSV is saved with UTF-8 encoding\n",
+    "  5. Re-run this chunk\n\n",
+    "MATCHED STUDIES (with NA utilities):\n"
+  ))
+}
+
+cat("✓ Validation passed:", pfs_valid_count, "valid PFS utilities,",
+    pd_valid_count, "valid PD utilities\n\n")
+
 # STEP 2: Compute mean utilities across mCRC literature
 # ------------------------------------------------------
 mean_PFS_mcrc <- mean(mcrc_pfs_studies$mean_utility, na.rm = TRUE)
 # mean() computes arithmetic average
 # na.rm = TRUE excludes missing values from calculation
 # Result: single numeric value representing "typical" PFS utility in mCRC
+# Note: If ALL values are NA, mean() returns NaN (not a number)
+#       If SOME values are NA, they are excluded and mean of remaining values is returned
 
 mean_PD_mcrc <- mean(mcrc_pd_studies$mean_utility, na.rm = TRUE)
 # Result: single numeric value representing "typical" PD utility in mCRC
@@ -396,7 +471,9 @@ mean_PD_mcrc <- mean(mcrc_pd_studies$mean_utility, na.rm = TRUE)
 # Print mean values for transparency
 cat("\n=== MEAN mCRC UTILITIES FROM LITERATURE ===\n")
 cat("Mean PFS-like utility (mCRC literature):", round(mean_PFS_mcrc, 4), "\n")
+cat("  (Computed from", pfs_valid_count, "studies with valid utilities)\n")
 cat("Mean PD-like utility (mCRC literature): ", round(mean_PD_mcrc, 4), "\n")
+cat("  (Computed from", pd_valid_count, "studies with valid utilities)\n")
 cat("\n")
 
 # STEP 3: Get reference UK population norm at age 65
@@ -419,44 +496,32 @@ mult_PD_mcrc <- mean_PD_mcrc / U_ref_uk65
 # Multiplier for PD state
 # Expected: << 1.0 (progressed cancer has substantially lower QoL)
 
-# VALIDATION: Check if multipliers are valid before using them
-# -------------------------------------------------------------
+# STEP 5: FINAL VALIDATION - Check if multipliers are valid
+# ----------------------------------------------------------
 # is.finite() returns FALSE if value is NA, NaN, Inf, or -Inf
 # This prevents "missing value where TRUE/FALSE needed" errors in if statements
+# Note: This should never fail now because we validated in STEP 1C above,
+# but we keep it as a final safety check.
 
 if (!is.finite(mult_PFS_mcrc)) {
   stop(paste0(
-    "\n=== ERROR: mult_PFS_mcrc is not a valid number ===\n",
+    "\n=== FATAL ERROR: mult_PFS_mcrc is not finite ===\n\n",
     "  mult_PFS_mcrc = ", mult_PFS_mcrc, "\n",
     "  mean_PFS_mcrc = ", mean_PFS_mcrc, "\n",
-    "  U_ref_uk65 = ", U_ref_uk65, "\n",
-    "  Number of PFS-like studies found: ", nrow(mcrc_pfs_studies), "\n\n",
-    "LIKELY CAUSE:\n",
-    "  The grep pattern for PFS-like studies matched 0 rows in df_mcrc_util.\n",
-    "  This causes mean(empty vector) to return NaN.\n\n",
-    "DIAGNOSTIC STEPS:\n",
-    "  1. Check that df_mcrc_util was loaded correctly\n",
-    "  2. Examine df_mcrc_util$line_or_state column for actual values\n",
-    "  3. Verify grep pattern matches your data\n",
-    "  4. Check column spelling: is it 'line_or_state' or something else?\n"
+    "  U_ref_uk65 = ", U_ref_uk65, "\n\n",
+    "This error should not occur if earlier validations passed.\n",
+    "Please report this as a bug.\n"
   ))
 }
 
 if (!is.finite(mult_PD_mcrc)) {
   stop(paste0(
-    "\n=== ERROR: mult_PD_mcrc is not a valid number ===\n",
+    "\n=== FATAL ERROR: mult_PD_mcrc is not finite ===\n\n",
     "  mult_PD_mcrc = ", mult_PD_mcrc, "\n",
     "  mean_PD_mcrc = ", mean_PD_mcrc, "\n",
-    "  U_ref_uk65 = ", U_ref_uk65, "\n",
-    "  Number of PD-like studies found: ", nrow(mcrc_pd_studies), "\n\n",
-    "LIKELY CAUSE:\n",
-    "  The grep pattern for PD-like studies matched 0 rows in df_mcrc_util.\n",
-    "  This causes mean(empty vector) to return NaN.\n\n",
-    "DIAGNOSTIC STEPS:\n",
-    "  1. Check that df_mcrc_util was loaded correctly\n",
-    "  2. Examine df_mcrc_util$line_or_state column for actual values\n",
-    "  3. Verify grep pattern matches your data\n",
-    "  4. Check column spelling: is it 'line_or_state' or something else?\n"
+    "  U_ref_uk65 = ", U_ref_uk65, "\n\n",
+    "This error should not occur if earlier validations passed.\n",
+    "Please report this as a bug.\n"
   ))
 }
 
