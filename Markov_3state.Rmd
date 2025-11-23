@@ -3369,10 +3369,9 @@ p_OSA3_FOLFIRI <- P_14
 
 
 # 2. Cost of treating the AE conditional on it occurring
-c_AE1 <- c_AE1
-c_AE2 <- c_AE2
-c_AE3 <- c_AE3 
-
+# NOTE: c_AE1, c_AE2, c_AE3 are defined in the country-specific blocks
+# (lines ~5148-5174) or inside run_country_analysis() function.
+# No need to reassign them here.
 
 # I don't need to update these costs when including adverse events in the OS state, because the adverse events people experiece are the same three described above, and because these are event specific costs we assume their costs are the same in PFS or OS.
 
