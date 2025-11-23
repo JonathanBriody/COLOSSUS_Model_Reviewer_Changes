@@ -2363,18 +2363,24 @@ P_OSD_Exp   <- 0.17 # Probability of dying when in OS.
 
 # I pursued this avenue and it was too complicated, so instead I just define the parameters that vary in the Rmarkdown file that calls this file.
 
-# Basically, what I do is set these parameters equal to the costs for the country I am interested in, in the Markdown file that calls this file, and then run this current file with the parameter names from the Rmarkdown file subbed in for costs and other country-specific values. Then I repeat this for each country I am interested in. 
+# Basically, what I do is set these parameters equal to the costs for the country I am interested in, in the Markdown file that calls this file, and then run this current file with the parameter names from the Rmarkdown file subbed in for costs and other country-specific values. Then I repeat this for each country I am interested in.
 
-c_PFS_Folfox <- c_PFS_Folfox 
-c_PFS_Bevacizumab <- c_PFS_Bevacizumab  
-c_OS_Folfiri <- c_OS_Folfiri  
-administration_cost <- administration_cost  
+# NOTE: The lines below are COMMENTED OUT as of the run_country_analysis() refactoring.
+# With the new approach, country-specific costs are defined INSIDE the run_country_analysis()
+# function with a _country suffix (e.g., c_PFS_Folfox_country), then passed to the model
+# engine via the l_params_all list. These old lines would fail because c_PFS_Folfox etc.
+# don't exist in the global environment anymore.
 
-
-c_F_SoC       <- administration_cost + c_PFS_Folfox  # cost of one cycle in PFS state under standard of care
-c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment 
-c_P       <- c_OS_Folfiri  + administration_cost# cost of one cycle in progression state (I assume in OS everyone gets the same treatment so it costs everyone the same to be treated).
-c_D       <- 0     # cost of one cycle in dead state
+# c_PFS_Folfox <- c_PFS_Folfox
+# c_PFS_Bevacizumab <- c_PFS_Bevacizumab
+# c_OS_Folfiri <- c_OS_Folfiri
+# administration_cost <- administration_cost
+#
+#
+# c_F_SoC       <- administration_cost + c_PFS_Folfox  # cost of one cycle in PFS state under standard of care
+# c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment
+# c_P       <- c_OS_Folfiri  + administration_cost# cost of one cycle in progression state (I assume in OS everyone gets the same treatment so it costs everyone the same to be treated).
+# c_D       <- 0     # cost of one cycle in dead state
 
 
 
@@ -2499,16 +2505,20 @@ u_D       <- 0         # Utility when dead
 
 # 4. Country-specific discount rate:
 
+# NOTE: The lines below are COMMENTED OUT as of the run_country_analysis() refactoring.
+# With the new approach, discount rates are defined INSIDE the run_country_analysis()
+# function and passed to the model via the l_params_all list.
+
 # Discounting factors
-d_c             <- country_discount_rate                          
+# d_c             <- country_discount_rate
 # discount rate for costs (per year)
-d_e             <- country_discount_rate                          
+# d_e             <- country_discount_rate
 # discount rate for QALYs (per year)
 
 # Discount weight (equal discounting is assumed for costs and effects):
 
-# v_dwc <- 1 / (1 + d_c) ^ (0:n_cycle) 
-# v_dwe <- 1 / (1 + d_e) ^ (0:n_cycle) 
+# v_dwc <- 1 / (1 + d_c) ^ (0:n_cycle)
+# v_dwe <- 1 / (1 + d_e) ^ (0:n_cycle)
 
 # This was my initial discount weight vector, but, I've updated this and do this later on now 
 
