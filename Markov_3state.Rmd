@@ -3850,13 +3850,128 @@ u_OS<-u_P-p_OSA1_FOLFIRI*u_AE1_OS*Duration_AE - p_OSA2_FOLFIRI*u_AE2_OS*Duration
 
 
 
-c_F_SoC<-c_F_SoC +p_FA1_STD*c_AE1 +p_FA2_STD*c_AE2 +p_FA3_STD*c_AE3
-c_F_Exp<-c_F_Exp +p_FA1_EXPR*c_AE1 +p_FA2_EXPR*c_AE2 +p_FA3_EXPR*c_AE3
+# ==============================================================================
+# INITIALIZE BASE STATE COSTS (Drug Acquisition + Administration)
+# ==============================================================================
+#
+# HEALTH ECONOMIC RATIONALE:
+# In a cost-effectiveness model, the total cost per cycle in each health state
+# comprises multiple components:
+#   1. Drug acquisition costs (the chemotherapy regimens)
+#   2. Administration costs (IV infusion, nursing time, facility overhead)
+#   3. Expected adverse event (AE) costs (probability-weighted treatment costs for AEs)
+#
+# We initialize the BASE state costs here by combining drug and administration costs.
+# These represent the core costs incurred by patients in each health state before
+# accounting for the additional expected costs due to adverse events.
+#
+# After initialization, we will ADD the expected AE costs (probability × one-time cost).
+# This approach separates the deterministic treatment costs from the probabilistic
+# AE-related costs, improving transparency and maintainability.
+#
+# COUNTRY-SPECIFIC ALIGNMENT:
+# These cost variables (c_PFS_Folfox, c_PFS_Bevacizumab, c_OS_Folfiri, administration_cost)
+# are set by the active country block (Ireland, Germany, or Spain) earlier in the script,
+# or are passed via the run_country_analysis() helper function when running automated
+# country loops. The country-specific inputs are already loaded into the environment
+# at this point, ensuring that the base costs reflect the correct jurisdiction.
+#
+# ------------------------------------------------------------------------------
+
+# c_F_SoC: Cost per cycle in the PFS (progression-free survival) state under
+#          standard of care (FOLFOX-4 regimen)
+#
+# COMPOSITION:
+#   - c_PFS_Folfox: Drug acquisition cost for FOLFOX-4 per 14-day cycle
+#   - administration_cost: IV administration cost per cycle (nursing, facility, etc.)
+#
+# This represents the baseline cost for patients who are progression-free and
+# receiving first-line standard-of-care chemotherapy (FOLFOX-4 only, no bevacizumab).
+c_F_SoC <- administration_cost + c_PFS_Folfox
 
 
-# If I am going to include AE's in OS, I will also need to include the costs of these AEs in OS, much like the above:
+# c_F_Exp: Cost per cycle in the PFS state under experimental treatment
+#          (FOLFOX-4 + Bevacizumab)
+#
+# COMPOSITION:
+#   - c_PFS_Folfox: Drug acquisition cost for FOLFOX-4 per 14-day cycle
+#   - c_PFS_Bevacizumab: Drug acquisition cost for bevacizumab (5 mg/kg) per cycle
+#   - administration_cost: IV administration cost per cycle
+#
+# This represents the baseline cost for patients who are progression-free and
+# receiving the experimental first-line treatment (FOLFOX-4 plus bevacizumab).
+# Bevacizumab is a biologic therapy added to standard chemotherapy, which significantly
+# increases the drug acquisition cost but may improve progression-free survival.
+c_F_Exp <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab
 
-c_P<-c_P+p_OSA1_FOLFIRI*c_AE1 +p_OSA2_FOLFIRI*c_AE2 +p_OSA3_FOLFIRI*c_AE3
+
+# c_P: Cost per cycle in the OS (overall survival / progressed) state
+#
+# COMPOSITION:
+#   - c_OS_Folfiri: Drug acquisition cost for FOLFIRI per 14-day cycle
+#   - administration_cost: IV administration cost per cycle
+#
+# This represents the baseline cost for patients who have progressed beyond first-line
+# therapy and are now receiving second-line treatment (FOLFIRI). In our model, ALL
+# patients receive the same second-line regimen after progression, regardless of whether
+# they initially received FOLFOX alone (SoC) or FOLFOX + bevacizumab (Exp). Therefore,
+# c_P is identical for both strategies once patients enter the progressed/OS state.
+c_P <- c_OS_Folfiri + administration_cost
+
+
+# ==============================================================================
+# ADD EXPECTED ADVERSE EVENT COSTS TO BASE STATE COSTS
+# ==============================================================================
+#
+# HEALTH ECONOMIC RATIONALE:
+# Adverse events (AEs) impose additional costs on the healthcare system beyond the
+# routine costs of drug acquisition and administration. Patients may experience AEs
+# such as leukopenia, diarrhea, and vomiting, which require medical intervention
+# (hospitalization, supportive care, medications).
+#
+# The EXPECTED cost of AEs per cycle is calculated as:
+#   Expected AE cost = Probability(AE) × Cost(treating the AE)
+#
+# We model three key AEs (AE1: Leukopenia, AE2: Diarrhea, AE3: Vomiting), each with:
+#   - A probability of occurrence per cycle (p_FA1, p_FA2, p_FA3)
+#   - A one-time treatment cost if the AE occurs (c_AE1, c_AE2, c_AE3)
+#
+# AE probabilities differ by:
+#   1. Treatment regimen (SoC vs Experimental in PFS; FOLFIRI in OS)
+#   2. Health state (PFS vs OS)
+#
+# AE costs (c_AE1, c_AE2, c_AE3) are country-specific and set by the active country block.
+#
+# IMPORTANT MODELING ASSUMPTION:
+# These probabilities represent the OVERALL probability of experiencing the AE during
+# treatment (not a per-cycle recurring probability). Therefore, the AE cost is applied
+# as a one-time expected cost added to the per-cycle state cost. This follows guidance
+# from our collaborator Qiushi (see comment above) and reflects how AE incidence was
+# reported in the source clinical trial (% of patients experiencing the AE during or
+# within 30 days of treatment, converted to 14-day cycle probabilities using an
+# exponential hazard transformation).
+#
+# ------------------------------------------------------------------------------
+
+# Adjust c_F_SoC (PFS state, standard of care) for expected AE costs
+# Patients on FOLFOX-4 alone have probabilities p_FA1_STD, p_FA2_STD, p_FA3_STD
+# of experiencing AE1, AE2, and AE3, respectively.
+c_F_SoC <- c_F_SoC + p_FA1_STD*c_AE1 + p_FA2_STD*c_AE2 + p_FA3_STD*c_AE3
+
+
+# Adjust c_F_Exp (PFS state, experimental treatment) for expected AE costs
+# Patients on FOLFOX-4 + bevacizumab have DIFFERENT AE probabilities
+# (p_FA1_EXPR, p_FA2_EXPR, p_FA3_EXPR), reflecting the toxicity profile of the
+# combination regimen. Bevacizumab may alter the incidence of certain AEs.
+c_F_Exp <- c_F_Exp + p_FA1_EXPR*c_AE1 + p_FA2_EXPR*c_AE2 + p_FA3_EXPR*c_AE3
+
+
+# Adjust c_P (OS/progressed state) for expected AE costs
+# ALL patients in the progressed state receive FOLFIRI as second-line therapy,
+# regardless of their initial treatment assignment. Therefore, both SoC and Exp
+# patients face the same AE probabilities in this state (p_OSA1_FOLFIRI, p_OSA2_FOLFIRI,
+# p_OSA3_FOLFIRI), and c_P is adjusted identically for both strategies.
+c_P <- c_P + p_OSA1_FOLFIRI*c_AE1 + p_OSA2_FOLFIRI*c_AE2 + p_OSA3_FOLFIRI*c_AE3
 
 
 
