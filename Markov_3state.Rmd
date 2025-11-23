@@ -419,7 +419,49 @@ mult_PD_mcrc <- mean_PD_mcrc / U_ref_uk65
 # Multiplier for PD state
 # Expected: << 1.0 (progressed cancer has substantially lower QoL)
 
+# VALIDATION: Check if multipliers are valid before using them
+# -------------------------------------------------------------
+# is.finite() returns FALSE if value is NA, NaN, Inf, or -Inf
+# This prevents "missing value where TRUE/FALSE needed" errors in if statements
+
+if (!is.finite(mult_PFS_mcrc)) {
+  stop(paste0(
+    "\n=== ERROR: mult_PFS_mcrc is not a valid number ===\n",
+    "  mult_PFS_mcrc = ", mult_PFS_mcrc, "\n",
+    "  mean_PFS_mcrc = ", mean_PFS_mcrc, "\n",
+    "  U_ref_uk65 = ", U_ref_uk65, "\n",
+    "  Number of PFS-like studies found: ", nrow(mcrc_pfs_studies), "\n\n",
+    "LIKELY CAUSE:\n",
+    "  The grep pattern for PFS-like studies matched 0 rows in df_mcrc_util.\n",
+    "  This causes mean(empty vector) to return NaN.\n\n",
+    "DIAGNOSTIC STEPS:\n",
+    "  1. Check that df_mcrc_util was loaded correctly\n",
+    "  2. Examine df_mcrc_util$line_or_state column for actual values\n",
+    "  3. Verify grep pattern matches your data\n",
+    "  4. Check column spelling: is it 'line_or_state' or something else?\n"
+  ))
+}
+
+if (!is.finite(mult_PD_mcrc)) {
+  stop(paste0(
+    "\n=== ERROR: mult_PD_mcrc is not a valid number ===\n",
+    "  mult_PD_mcrc = ", mult_PD_mcrc, "\n",
+    "  mean_PD_mcrc = ", mean_PD_mcrc, "\n",
+    "  U_ref_uk65 = ", U_ref_uk65, "\n",
+    "  Number of PD-like studies found: ", nrow(mcrc_pd_studies), "\n\n",
+    "LIKELY CAUSE:\n",
+    "  The grep pattern for PD-like studies matched 0 rows in df_mcrc_util.\n",
+    "  This causes mean(empty vector) to return NaN.\n\n",
+    "DIAGNOSTIC STEPS:\n",
+    "  1. Check that df_mcrc_util was loaded correctly\n",
+    "  2. Examine df_mcrc_util$line_or_state column for actual values\n",
+    "  3. Verify grep pattern matches your data\n",
+    "  4. Check column spelling: is it 'line_or_state' or something else?\n"
+  ))
+}
+
 # Print multipliers for transparency
+# (Safe to print now because we know they're valid)
 cat("=== mCRC-BASED MULTIPLIERS ===\n")
 cat("mult_PFS_mcrc (PFS multiplier):", round(mult_PFS_mcrc, 4), "\n")
 cat("  Interpretation: mCRC PFS utility is", round(mult_PFS_mcrc * 100, 1), "% of UK population norm\n")
