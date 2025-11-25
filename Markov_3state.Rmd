@@ -11904,9 +11904,14 @@ for (ctry in countries_to_analyze) {
       AE2_DisUtil = AE2_DisUtil,
       AE3_DisUtil = AE3_DisUtil,
 
-      # Country-specific discount rates
-      d_e = d_e_ctry,
-      d_c = d_c_ctry,
+      # Country-specific discount rates (converted to daily for 14-day cycles)
+      # NOTE: Annual rates must be converted to daily rates because the model
+      #       uses 14-day cycles with t_cycle = 14 days. The discounting formula
+      #       v_dwc <- 1 / ((1 + d_c) ^ ((0:(n_cycle-1)) * t_cycle))
+      #       multiplies the discount rate by t_cycle (in days), so d_c and d_e
+      #       must be in daily units for correct discounting over the time horizon.
+      d_e = d_e_ctry / 365,
+      d_c = d_c_ctry / 365,
 
       # Other parameters (assumed already defined earlier)
       n_cycle = n_cycle,
