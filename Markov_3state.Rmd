@@ -774,37 +774,185 @@ get_utility_scenario <- function(
 ```{r}
 
 #===============================================================================
-# NOTE: COUNTRY-SPECIFIC ANALYSIS HAS BEEN REFACTORED
+# COUNTRY-SPECIFIC PARAMETERS
 #===============================================================================
 #
-# Previously, this section contained manual country blocks for Ireland, Germany,
-# and Spain that required commenting/uncommenting to switch between countries.
+# This section defines country-specific costs, WTP thresholds, and discount rates
+# for Ireland, Germany, and Spain.
 #
-# This has been REPLACED with an automated approach using the helper function
-# run_country_analysis() which is defined and called later in this document
-# (see section "HELPER FUNCTION AND MAIN COUNTRY ANALYSIS" around line 4660).
-#
-# BENEFITS OF NEW APPROACH:
-# - No manual editing required to run all countries
-# - All countries analyzed automatically with identical model structure
-# - Results automatically combined for easy comparison
-# - Reduced risk of errors from manual code changes
-# - Better reproducibility and transparency
-#
-# The country-specific analysis now happens AFTER all global parameters
-# (hazard ratios, AE probabilities, survival coefficients, etc.) are defined.
-#
-# For backward compatibility with existing code chunks that expect certain
-# variables to be defined (e.g., OWSA, TWSA, PSA), default country variables
-# are set after the main country loop runs.
+# STRATEGY:
+# 1. A helper function get_country_params() returns all country-specific parameters
+# 2. By default, Ireland parameters are loaded (so variables exist for downstream chunks)
+# 3. To analyze a different country, manually change DEFAULT_COUNTRY below
+# 4. To run all countries automatically, see the utility scenario analysis chunk
+#    at the end of this document
 #
 #===============================================================================
-
 
 # Create output directory if it doesn't exist
 if (!dir.exists("output")) {
   dir.create("output", recursive = TRUE)
 }
+
+
+#===============================================================================
+# HELPER FUNCTION: get_country_params()
+#===============================================================================
+#
+# Returns a list of country-specific parameters for the specified country.
+#
+# PARAMETERS:
+#   country: "Ireland", "Germany", or "Spain"
+#
+# RETURNS:
+#   Named list with:
+#     - country_name: Country identifier
+#     - c_PFS_Folfox: Cost of FOLFOX per 14-day cycle
+#     - c_PFS_Bevacizumab: Cost of Bevacizumab per cycle
+#     - c_OS_Folfiri: Cost of FOLFIRI per cycle
+#     - administration_cost: IV administration cost per cycle
+#     - subtyping_test_cost: One-time RAS/BRAF subtyping test cost
+#     - c_AE1: Cost of treating leukopenia (grade 3/4)
+#     - c_AE2: Cost of treating diarrhea (grade 3/4)
+#     - c_AE3: Cost of treating nausea/vomiting (grade 3/4)
+#     - n_wtp: Willingness-to-pay threshold (€/QALY)
+#     - country_discount_rate: Annual discount rate (base case)
+#     - country_max_discount_rate: Annual discount rate (upper bound for sensitivity)
+#     - country_min_discount_rate: Annual discount rate (lower bound for sensitivity)
+#
+get_country_params <- function(country) {
+
+  if (country == "Ireland") {
+    return(list(
+      country_name = "Ireland",
+
+      # 1. Cost of treatment in this country (2024 values)
+      c_PFS_Folfox = 157.77,
+      c_PFS_Bevacizumab = 1425.84,
+      c_OS_Folfiri = 167.10,
+      administration_cost = 406.50,
+      subtyping_test_cost = 400,
+
+      # 2. Cost of treating adverse events conditional on occurrence
+      c_AE1 = 3485.23,  # Leukopenia
+      c_AE2 = 1792.82,  # Diarrhea
+      c_AE3 = 502.69,   # Nausea/vomiting
+
+      # 3. Willingness to pay threshold
+      n_wtp = 45000,
+
+      # 4. Country-specific discount rates
+      country_discount_rate = 0.04,
+      country_max_discount_rate = 0.08,
+      country_min_discount_rate = 0.00
+    ))
+
+  } else if (country == "Germany") {
+
+    # Germany costs received as monthly values, converted to 14-day cycles
+    return(list(
+      country_name = "Germany",
+
+      # 1. Cost of treatment in this country (2024 values)
+      # Monthly costs converted to 14-day cycles: (monthly / 30) * 14
+      c_PFS_Folfox = ((1406.37 / 30) * 14),
+      c_PFS_Bevacizumab = ((3252.19 / 30) * 14),
+      c_OS_Folfiri = ((1442.70 / 30) * 14),
+      administration_cost = 1927.72,
+      subtyping_test_cost = 400,
+
+      # 2. Cost of treating adverse events conditional on occurrence
+      c_AE1 = 4188.31,  # Leukopenia
+      c_AE2 = 1982.68,  # Diarrhea
+      c_AE3 = 1307.72,  # Nausea/vomiting
+
+      # 3. Willingness to pay threshold
+      n_wtp = 78871,
+
+      # 4. Country-specific discount rates
+      country_discount_rate = 0.03,
+      country_max_discount_rate = 0.06,
+      country_min_discount_rate = 0.00
+    ))
+
+  } else if (country == "Spain") {
+    return(list(
+      country_name = "Spain",
+
+      # 1. Cost of treatment in this country (2024 values)
+      c_PFS_Folfox = 323.39,
+      c_PFS_Bevacizumab = 1399.33,
+      c_OS_Folfiri = 147.31,
+      administration_cost = 332.39,
+      subtyping_test_cost = 400,
+
+      # 2. Cost of treating adverse events conditional on occurrence
+      c_AE1 = 5710.97,  # Leukopenia
+      c_AE2 = 305.55,   # Diarrhea
+      c_AE3 = 35.11,    # Nausea/vomiting
+
+      # 3. Willingness to pay threshold
+      n_wtp = 30000,
+
+      # 4. Country-specific discount rates
+      country_discount_rate = 0.03,
+      country_max_discount_rate = 0.06,
+      country_min_discount_rate = 0.00
+    ))
+
+  } else {
+    stop(paste("Unknown country:", country,
+               "\nValid options are: 'Ireland', 'Germany', 'Spain'"))
+  }
+}
+
+
+#===============================================================================
+# SET DEFAULT COUNTRY PARAMETERS
+#===============================================================================
+#
+# By default, we load Ireland parameters. This ensures that all country-specific
+# variables are defined for downstream chunks that reference them directly
+# (e.g., c_F_SoC <- administration_cost + c_PFS_Folfox).
+#
+# TO CHANGE COUNTRY: Modify DEFAULT_COUNTRY below to "Germany" or "Spain"
+#
+# TO RUN ALL COUNTRIES AUTOMATICALLY: See the utility scenario analysis chunk
+# at the end of this document, which loops through all countries sequentially.
+#
+#===============================================================================
+
+# Set the default country for this analysis
+DEFAULT_COUNTRY <- "Ireland"
+
+# Load country-specific parameters into workspace
+params <- get_country_params(DEFAULT_COUNTRY)
+
+# Unpack parameters into individual variables
+country_name            <- params$country_name
+c_PFS_Folfox           <- params$c_PFS_Folfox
+c_PFS_Bevacizumab      <- params$c_PFS_Bevacizumab
+c_OS_Folfiri           <- params$c_OS_Folfiri
+administration_cost     <- params$administration_cost
+subtyping_test_cost    <- params$subtyping_test_cost
+c_AE1                  <- params$c_AE1
+c_AE2                  <- params$c_AE2
+c_AE3                  <- params$c_AE3
+n_wtp                  <- params$n_wtp
+country_discount_rate      <- params$country_discount_rate
+country_max_discount_rate  <- params$country_max_discount_rate
+country_min_discount_rate  <- params$country_min_discount_rate
+
+# Print confirmation
+cat("\n")
+cat("================================================================================\n")
+cat("COUNTRY-SPECIFIC PARAMETERS LOADED\n")
+cat("================================================================================\n")
+cat("Country:", country_name, "\n")
+cat("WTP threshold: €", format(n_wtp, big.mark=","), " per QALY\n", sep="")
+cat("Discount rate:", country_discount_rate, "(range:", country_min_discount_rate, "-", country_max_discount_rate, ")\n")
+cat("================================================================================\n")
+cat("\n")
 
 
 
@@ -11775,55 +11923,26 @@ for (ctry in countries_to_analyze) {
   cat("COUNTRY:", ctry, "\n")
   cat("========================================================================\n")
 
-  # Set country-specific parameters
-  # --------------------------------
-  # NOTE: In the actual implementation, you would need to extract these from
-  #       the country blocks defined earlier in the document. For now, we
-  #       assume they are set correctly by uncommenting the appropriate block.
-  #
-  # For a fully automated approach, you could define a helper function:
-  #   get_country_params <- function(country_name) { ... }
-  # that returns a list with c_PFS_Folfox, n_wtp, discount_rate, etc.
-  #
-  # For this demonstration, we'll manually set them based on the country:
+  # Set country-specific parameters using helper function
+  # ------------------------------------------------------
+  # The get_country_params() function (defined earlier in this document)
+  # returns all country-specific costs, WTP threshold, and discount rates.
+  # This ensures consistency across all analyses and avoids hard-coding values.
 
-  if (ctry == "Ireland") {
-    c_PFS_Folfox_ctry <- 157.77
-    c_PFS_Bevacizumab_ctry <- 1425.84
-    c_OS_Folfiri_ctry <- 167.10
-    administration_cost_ctry <- 406.50
-    subtyping_test_cost_ctry <- 400
-    c_AE1_ctry <- 3485.23
-    c_AE2_ctry <- 1792.82
-    c_AE3_ctry <- 502.69
-    n_wtp_ctry <- 45000
-    d_c_ctry <- 0.04
-    d_e_ctry <- 0.04
-  } else if (ctry == "Germany") {
-    c_PFS_Folfox_ctry <- ((1406.37 / 30) * 14)
-    c_PFS_Bevacizumab_ctry <- ((3252.19 / 30) * 14)
-    c_OS_Folfiri_ctry <- ((1442.70 / 30) * 14)
-    administration_cost_ctry <- 1927.72
-    subtyping_test_cost_ctry <- 400
-    c_AE1_ctry <- 4188.31
-    c_AE2_ctry <- 1982.68
-    c_AE3_ctry <- 1307.72
-    n_wtp_ctry <- 78871
-    d_c_ctry <- 0.03
-    d_e_ctry <- 0.03
-  } else if (ctry == "Spain") {
-    c_PFS_Folfox_ctry <- 122.84
-    c_PFS_Bevacizumab_ctry <- 885.60
-    c_OS_Folfiri_ctry <- 154.38
-    administration_cost_ctry <- 378.92
-    subtyping_test_cost_ctry <- 400
-    c_AE1_ctry <- 2866.15
-    c_AE2_ctry <- 1549.30
-    c_AE3_ctry <- 330.91
-    n_wtp_ctry <- 30000
-    d_c_ctry <- 0.03
-    d_e_ctry <- 0.03
-  }
+  params_ctry <- get_country_params(ctry)
+
+  # Extract country-specific parameters
+  c_PFS_Folfox_ctry <- params_ctry$c_PFS_Folfox
+  c_PFS_Bevacizumab_ctry <- params_ctry$c_PFS_Bevacizumab
+  c_OS_Folfiri_ctry <- params_ctry$c_OS_Folfiri
+  administration_cost_ctry <- params_ctry$administration_cost
+  subtyping_test_cost_ctry <- params_ctry$subtyping_test_cost
+  c_AE1_ctry <- params_ctry$c_AE1
+  c_AE2_ctry <- params_ctry$c_AE2
+  c_AE3_ctry <- params_ctry$c_AE3
+  n_wtp_ctry <- params_ctry$n_wtp
+  d_c_ctry <- params_ctry$country_discount_rate
+  d_e_ctry <- params_ctry$country_discount_rate  # Assume same rate for costs and effects
 
   for (scen in scenarios_to_run) {
     # Inner loop: iterate over scenarios for this country
