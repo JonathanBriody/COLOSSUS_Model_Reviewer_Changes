@@ -2363,24 +2363,18 @@ P_OSD_Exp   <- 0.17 # Probability of dying when in OS.
 
 # I pursued this avenue and it was too complicated, so instead I just define the parameters that vary in the Rmarkdown file that calls this file.
 
-# Basically, what I do is set these parameters equal to the costs for the country I am interested in, in the Markdown file that calls this file, and then run this current file with the parameter names from the Rmarkdown file subbed in for costs and other country-specific values. Then I repeat this for each country I am interested in.
+# Basically, what I do is set these parameters equal to the costs for the country I am interested in, in the Markdown file that calls this file, and then run this current file with the parameter names from the Rmarkdown file subbed in for costs and other country-specific values. Then I repeat this for each country I am interested in. 
 
-# NOTE: The lines below are COMMENTED OUT as of the run_country_analysis() refactoring.
-# With the new approach, country-specific costs are defined INSIDE the run_country_analysis()
-# function with a _country suffix (e.g., c_PFS_Folfox_country), then passed to the model
-# engine via the l_params_all list. These old lines would fail because c_PFS_Folfox etc.
-# don't exist in the global environment anymore.
+c_PFS_Folfox <- c_PFS_Folfox 
+c_PFS_Bevacizumab <- c_PFS_Bevacizumab  
+c_OS_Folfiri <- c_OS_Folfiri  
+administration_cost <- administration_cost  
 
-# c_PFS_Folfox <- c_PFS_Folfox
-# c_PFS_Bevacizumab <- c_PFS_Bevacizumab
-# c_OS_Folfiri <- c_OS_Folfiri
-# administration_cost <- administration_cost
-#
-#
-# c_F_SoC       <- administration_cost + c_PFS_Folfox  # cost of one cycle in PFS state under standard of care
-# c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment
-# c_P       <- c_OS_Folfiri  + administration_cost# cost of one cycle in progression state (I assume in OS everyone gets the same treatment so it costs everyone the same to be treated).
-# c_D       <- 0     # cost of one cycle in dead state
+
+c_F_SoC       <- administration_cost + c_PFS_Folfox  # cost of one cycle in PFS state under standard of care
+c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment 
+c_P       <- c_OS_Folfiri  + administration_cost# cost of one cycle in progression state (I assume in OS everyone gets the same treatment so it costs everyone the same to be treated).
+c_D       <- 0     # cost of one cycle in dead state
 
 
 
@@ -2505,20 +2499,16 @@ u_D       <- 0         # Utility when dead
 
 # 4. Country-specific discount rate:
 
-# NOTE: The lines below are COMMENTED OUT as of the run_country_analysis() refactoring.
-# With the new approach, discount rates are defined INSIDE the run_country_analysis()
-# function and passed to the model via the l_params_all list.
-
 # Discounting factors
-# d_c             <- country_discount_rate
+d_c             <- country_discount_rate                          
 # discount rate for costs (per year)
-# d_e             <- country_discount_rate
+d_e             <- country_discount_rate                          
 # discount rate for QALYs (per year)
 
 # Discount weight (equal discounting is assumed for costs and effects):
 
-# v_dwc <- 1 / (1 + d_c) ^ (0:n_cycle)
-# v_dwe <- 1 / (1 + d_e) ^ (0:n_cycle)
+# v_dwc <- 1 / (1 + d_c) ^ (0:n_cycle) 
+# v_dwe <- 1 / (1 + d_e) ^ (0:n_cycle) 
 
 # This was my initial discount weight vector, but, I've updated this and do this later on now 
 
@@ -3369,9 +3359,10 @@ p_OSA3_FOLFIRI <- P_14
 
 
 # 2. Cost of treating the AE conditional on it occurring
-# NOTE: c_AE1, c_AE2, c_AE3 are defined in the country-specific blocks
-# (lines ~5148-5174) or inside run_country_analysis() function.
-# No need to reassign them here.
+c_AE1 <- c_AE1
+c_AE2 <- c_AE2
+c_AE3 <- c_AE3 
+
 
 # I don't need to update these costs when including adverse events in the OS state, because the adverse events people experiece are the same three described above, and because these are event specific costs we assume their costs are the same in PFS or OS.
 
@@ -3850,128 +3841,13 @@ u_OS<-u_P-p_OSA1_FOLFIRI*u_AE1_OS*Duration_AE - p_OSA2_FOLFIRI*u_AE2_OS*Duration
 
 
 
-# ==============================================================================
-# INITIALIZE BASE STATE COSTS (Drug Acquisition + Administration)
-# ==============================================================================
-#
-# HEALTH ECONOMIC RATIONALE:
-# In a cost-effectiveness model, the total cost per cycle in each health state
-# comprises multiple components:
-#   1. Drug acquisition costs (the chemotherapy regimens)
-#   2. Administration costs (IV infusion, nursing time, facility overhead)
-#   3. Expected adverse event (AE) costs (probability-weighted treatment costs for AEs)
-#
-# We initialize the BASE state costs here by combining drug and administration costs.
-# These represent the core costs incurred by patients in each health state before
-# accounting for the additional expected costs due to adverse events.
-#
-# After initialization, we will ADD the expected AE costs (probability × one-time cost).
-# This approach separates the deterministic treatment costs from the probabilistic
-# AE-related costs, improving transparency and maintainability.
-#
-# COUNTRY-SPECIFIC ALIGNMENT:
-# These cost variables (c_PFS_Folfox, c_PFS_Bevacizumab, c_OS_Folfiri, administration_cost)
-# are set by the active country block (Ireland, Germany, or Spain) earlier in the script,
-# or are passed via the run_country_analysis() helper function when running automated
-# country loops. The country-specific inputs are already loaded into the environment
-# at this point, ensuring that the base costs reflect the correct jurisdiction.
-#
-# ------------------------------------------------------------------------------
-
-# c_F_SoC: Cost per cycle in the PFS (progression-free survival) state under
-#          standard of care (FOLFOX-4 regimen)
-#
-# COMPOSITION:
-#   - c_PFS_Folfox: Drug acquisition cost for FOLFOX-4 per 14-day cycle
-#   - administration_cost: IV administration cost per cycle (nursing, facility, etc.)
-#
-# This represents the baseline cost for patients who are progression-free and
-# receiving first-line standard-of-care chemotherapy (FOLFOX-4 only, no bevacizumab).
-c_F_SoC <- administration_cost + c_PFS_Folfox
+c_F_SoC<-c_F_SoC +p_FA1_STD*c_AE1 +p_FA2_STD*c_AE2 +p_FA3_STD*c_AE3
+c_F_Exp<-c_F_Exp +p_FA1_EXPR*c_AE1 +p_FA2_EXPR*c_AE2 +p_FA3_EXPR*c_AE3
 
 
-# c_F_Exp: Cost per cycle in the PFS state under experimental treatment
-#          (FOLFOX-4 + Bevacizumab)
-#
-# COMPOSITION:
-#   - c_PFS_Folfox: Drug acquisition cost for FOLFOX-4 per 14-day cycle
-#   - c_PFS_Bevacizumab: Drug acquisition cost for bevacizumab (5 mg/kg) per cycle
-#   - administration_cost: IV administration cost per cycle
-#
-# This represents the baseline cost for patients who are progression-free and
-# receiving the experimental first-line treatment (FOLFOX-4 plus bevacizumab).
-# Bevacizumab is a biologic therapy added to standard chemotherapy, which significantly
-# increases the drug acquisition cost but may improve progression-free survival.
-c_F_Exp <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab
+# If I am going to include AE's in OS, I will also need to include the costs of these AEs in OS, much like the above:
 
-
-# c_P: Cost per cycle in the OS (overall survival / progressed) state
-#
-# COMPOSITION:
-#   - c_OS_Folfiri: Drug acquisition cost for FOLFIRI per 14-day cycle
-#   - administration_cost: IV administration cost per cycle
-#
-# This represents the baseline cost for patients who have progressed beyond first-line
-# therapy and are now receiving second-line treatment (FOLFIRI). In our model, ALL
-# patients receive the same second-line regimen after progression, regardless of whether
-# they initially received FOLFOX alone (SoC) or FOLFOX + bevacizumab (Exp). Therefore,
-# c_P is identical for both strategies once patients enter the progressed/OS state.
-c_P <- c_OS_Folfiri + administration_cost
-
-
-# ==============================================================================
-# ADD EXPECTED ADVERSE EVENT COSTS TO BASE STATE COSTS
-# ==============================================================================
-#
-# HEALTH ECONOMIC RATIONALE:
-# Adverse events (AEs) impose additional costs on the healthcare system beyond the
-# routine costs of drug acquisition and administration. Patients may experience AEs
-# such as leukopenia, diarrhea, and vomiting, which require medical intervention
-# (hospitalization, supportive care, medications).
-#
-# The EXPECTED cost of AEs per cycle is calculated as:
-#   Expected AE cost = Probability(AE) × Cost(treating the AE)
-#
-# We model three key AEs (AE1: Leukopenia, AE2: Diarrhea, AE3: Vomiting), each with:
-#   - A probability of occurrence per cycle (p_FA1, p_FA2, p_FA3)
-#   - A one-time treatment cost if the AE occurs (c_AE1, c_AE2, c_AE3)
-#
-# AE probabilities differ by:
-#   1. Treatment regimen (SoC vs Experimental in PFS; FOLFIRI in OS)
-#   2. Health state (PFS vs OS)
-#
-# AE costs (c_AE1, c_AE2, c_AE3) are country-specific and set by the active country block.
-#
-# IMPORTANT MODELING ASSUMPTION:
-# These probabilities represent the OVERALL probability of experiencing the AE during
-# treatment (not a per-cycle recurring probability). Therefore, the AE cost is applied
-# as a one-time expected cost added to the per-cycle state cost. This follows guidance
-# from our collaborator Qiushi (see comment above) and reflects how AE incidence was
-# reported in the source clinical trial (% of patients experiencing the AE during or
-# within 30 days of treatment, converted to 14-day cycle probabilities using an
-# exponential hazard transformation).
-#
-# ------------------------------------------------------------------------------
-
-# Adjust c_F_SoC (PFS state, standard of care) for expected AE costs
-# Patients on FOLFOX-4 alone have probabilities p_FA1_STD, p_FA2_STD, p_FA3_STD
-# of experiencing AE1, AE2, and AE3, respectively.
-c_F_SoC <- c_F_SoC + p_FA1_STD*c_AE1 + p_FA2_STD*c_AE2 + p_FA3_STD*c_AE3
-
-
-# Adjust c_F_Exp (PFS state, experimental treatment) for expected AE costs
-# Patients on FOLFOX-4 + bevacizumab have DIFFERENT AE probabilities
-# (p_FA1_EXPR, p_FA2_EXPR, p_FA3_EXPR), reflecting the toxicity profile of the
-# combination regimen. Bevacizumab may alter the incidence of certain AEs.
-c_F_Exp <- c_F_Exp + p_FA1_EXPR*c_AE1 + p_FA2_EXPR*c_AE2 + p_FA3_EXPR*c_AE3
-
-
-# Adjust c_P (OS/progressed state) for expected AE costs
-# ALL patients in the progressed state receive FOLFIRI as second-line therapy,
-# regardless of their initial treatment assignment. Therefore, both SoC and Exp
-# patients face the same AE probabilities in this state (p_OSA1_FOLFIRI, p_OSA2_FOLFIRI,
-# p_OSA3_FOLFIRI), and c_P is adjusted identically for both strategies.
-c_P <- c_P + p_OSA1_FOLFIRI*c_AE1 + p_OSA2_FOLFIRI*c_AE2 + p_OSA3_FOLFIRI*c_AE3
+c_P<-c_P+p_OSA1_FOLFIRI*c_AE1 +p_OSA2_FOLFIRI*c_AE2 +p_OSA3_FOLFIRI*c_AE3
 
 
 
@@ -4720,606 +4596,155 @@ curve_choice <- "weibull"
 # If I updated utility for AE above, then I'll have to take that into account for u_F below:
 
 #===============================================================================
-# HELPER FUNCTION AND MAIN COUNTRY ANALYSIS
-#===============================================================================
-#
-# This section defines run_country_analysis() - a helper function that
-# encapsulates the entire country-specific analysis workflow.
-#
-# REPLACES: The previous manual country blocks (formerly at lines 774-870)
-#           and single-country utility scenario application
-#
-# NEW APPROACH: Automated analysis of all three countries with identical
-#               model structure, eliminating manual code editing
-#
+# DEFINE UTILITY SCENARIO FLAG
 #===============================================================================
 
+# This flag controls which utility values are used in the model:
+#   - "ramsey_basecase"           → Use Ramsey et al. (2000) values (0.85, 0.65) unchanged
+#   - "population_norm_adjusted"  → Use mCRC multipliers × country/age population norms
+#
+# DEFAULT: Use Ramsey base case (preserves all published results)
+utility_scenario <- "ramsey_basecase"
 
-#===============================================================================
-# HELPER FUNCTION: run_country_analysis()
-#===============================================================================
+# TO RUN POPULATION NORM SCENARIO: Uncomment the line below
+# utility_scenario <- "population_norm_adjusted"
 
-run_country_analysis <- function(
-  country_name,
-  utility_scenario = "ramsey_basecase",
-  patient_age = 65,
-  curve_choice_param = "weibull"
-) {
-  # ============================================================================
-  # PURPOSE:
-  # --------
-  # This function encapsulates the entire country-specific CEA workflow:
-  # 1. Set country-specific costs, discount rates, and WTP threshold
-  # 2. Obtain utilities via get_utility_scenario()
-  # 3. Build complete parameter list (l_params_all)
-  # 4. Run oncologySemiMarkov() model
-  # 5. Extract and structure results
-  # 6. Return results as a single-row data frame
-  #
-  # HEALTH-ECONOMIC RATIONALE:
-  # --------------------------
-  # Separating country-specific parameterisation from model logic ensures:
-  # - Consistency: All countries use identical model structure and methods
-  # - Transparency: Parameter differences are explicit and documented
-  # - Reproducibility: Analyses can be re-run programmatically
-  # - Flexibility: Easy to add new countries or modify existing parameters
-  #
-  # The base-case model structure remains unchanged for each country. Only the
-  # country-specific inputs (costs, discount rates, WTP thresholds, population
-  # norms) differ across jurisdictions.
-  #
-  # PARAMETERS:
-  # -----------
-  # @param country_name: "Ireland", "Germany", or "Spain"
-  # @param utility_scenario: "ramsey_basecase" or "population_norm_adjusted"
-  # @param patient_age: Age for population norm lookup (default 65)
-  # @param curve_choice_param: "weibull" or "gamma" (default "weibull")
-  #
-  # RETURNS:
-  # --------
-  # Single-row data frame with columns: country, utility_scenario, u_PFS, u_PD,
-  # cost_SoC, cost_Exp, qaly_SoC, qaly_Exp, inc_cost, inc_qaly, icer, nmb, n_wtp
-  #
-  # DEPENDENCIES:
-  # -------------
-  # Assumes the following exist in global environment:
-  # - Functions: get_utility_scenario(), oncologySemiMarkov()
-  # - Data: df_popnorm
-  # - Global parameters: HR_FP_Exp, HR_FP_SoC, HR_PD_Exp, HR_PD_SoC, P_OSD_SoC,
-  #   P_OSD_Exp, p_FA1_STD, p_FA2_STD, p_FA3_STD, p_FA1_EXPR, p_FA2_EXPR,
-  #   p_FA3_EXPR, p_OSA1_FOLFIRI, p_OSA2_FOLFIRI, p_OSA3_FOLFIRI, c_D,
-  #   AE1_DisUtil, AE2_DisUtil, AE3_DisUtil, u_D, n_cycle, t_cycle
-  # - Survival coefficients: coef_weibull_shape_SoC, coef_weibull_scale_SoC,
-  #   coef_TTD_weibull_shape_SoC, coef_TTD_weibull_scale_SoC (and gamma versions)
-  # ============================================================================
-
-  # Print header
-  # ------------
-  cat("\n")
-  cat("========================================================================\n")
-  cat("RUNNING COUNTRY ANALYSIS\n")
-  cat("========================================================================\n")
-  cat("Country:          ", country_name, "\n")
-  cat("Utility scenario: ", utility_scenario, "\n")
-  cat("Curve choice:     ", curve_choice_param, "\n")
-  cat("------------------------------------------------------------------------\n")
-
-  #=============================================================================
-  # STEP 1: SET COUNTRY-SPECIFIC PARAMETERS
-  #=============================================================================
-  # Each country has different costs, discount rates, and WTP thresholds
-  # reflecting local drug pricing, healthcare systems, and policy guidelines
-  #=============================================================================
-
-  if (country_name == "Ireland") {
-    # IRELAND PARAMETERS
-    # ------------------
-    # Source: Irish drug pricing and HIQA guidelines
-
-    # Treatment costs per 14-day cycle (€)
-    c_PFS_Folfox_country <- 157.77          # FOLFOX-4 regimen
-    c_PFS_Bevacizumab_country <- 1425.84    # Bevacizumab (5mg/kg)
-    c_OS_Folfiri_country <- 167.10          # FOLFIRI regimen
-    administration_cost_country <- 406.50    # IV administration per cycle
-    subtyping_test_cost_country <- 400       # RAS testing (one-time)
-
-    # Adverse event costs (€) - one-time costs when AE occurs
-    c_AE1_country <- 3485.23  # Grade 3+ neutropenia management
-    c_AE2_country <- 1792.82  # Grade 3+ diarrhea management
-    c_AE3_country <- 502.69   # Grade 3+ nausea/vomiting management
-
-    # Willingness-to-pay threshold (€/QALY)
-    n_wtp_country <- 45000  # HIQA guideline for Ireland
-
-    # Discount rate (annual)
-    country_discount_rate_val <- 0.04  # 4% for costs and effects (HIQA)
-
-  } else if (country_name == "Germany") {
-    # GERMANY PARAMETERS
-    # ------------------
-    # Source: German drug pricing and IQWiG guidelines
-    # Note: Costs received as monthly values, converted to 14-day cycles
-
-    # Treatment costs per 14-day cycle (€)
-    # Conversion formula: (monthly cost / 30 days) × 14 days
-    c_PFS_Folfox_country <- ((1406.37 / 30) * 14)
-    c_PFS_Bevacizumab_country <- ((3252.19 / 30) * 14)
-    c_OS_Folfiri_country <- ((1442.70 / 30) * 14)
-    administration_cost_country <- 1927.72
-    subtyping_test_cost_country <- 400
-
-    # Adverse event costs (€)
-    c_AE1_country <- 4188.31
-    c_AE2_country <- 1982.68
-    c_AE3_country <- 1307.72
-
-    # Willingness-to-pay threshold (€/QALY)
-    n_wtp_country <- 78871  # Implicit threshold from IQWiG assessments
-
-    # Discount rate (annual)
-    country_discount_rate_val <- 0.03  # 3% for costs and effects (IQWiG)
-
-  } else if (country_name == "Spain") {
-    # SPAIN PARAMETERS
-    # ----------------
-    # Source: Spanish drug pricing and health economic guidelines
-
-    # Treatment costs per 14-day cycle (€)
-    c_PFS_Folfox_country <- 323.39
-    c_PFS_Bevacizumab_country <- 1399.33
-    c_OS_Folfiri_country <- 147.31
-    administration_cost_country <- 332.39
-    subtyping_test_cost_country <- 400
-
-    # Adverse event costs (€)
-    c_AE1_country <- 5710.97
-    c_AE2_country <- 305.55
-    c_AE3_country <- 35.11
-
-    # Willingness-to-pay threshold (€/QALY)
-    n_wtp_country <- 30000  # Commonly cited threshold for Spain
-
-    # Discount rate (annual)
-    country_discount_rate_val <- 0.03  # 3% for costs and effects
-
-  } else {
-    # ERROR HANDLING: Unknown country
-    stop("Unknown country: ", country_name,
-         ". Must be 'Ireland', 'Germany', or 'Spain'.")
-  }
-
-  # Convert annual discount rates to daily rates
-  # ---------------------------------------------
-  # Model operates on 14-day cycles, so rates must be daily
-  # Formula: daily_rate = annual_rate / 365
-  d_c_country <- country_discount_rate_val / 365  # Daily rate for costs
-  d_e_country <- country_discount_rate_val / 365  # Daily rate for effects
-
-  cat("Treatment costs:   FOLFOX = €", round(c_PFS_Folfox_country, 2),
-      ", Bev = €", round(c_PFS_Bevacizumab_country, 2), "\n", sep = "")
-  cat("WTP threshold:     €", n_wtp_country, " per QALY\n", sep = "")
-  cat("Discount rate:     ", country_discount_rate_val * 100, "% (annual)\n", sep = "")
-
-  #=============================================================================
-  # STEP 2: OBTAIN SCENARIO-SPECIFIC UTILITIES
-  #=============================================================================
-  # Call get_utility_scenario() to get PFS and PD utilities based on:
-  # - Country (for population norm lookup if needed)
-  # - Age (representative patient age, typically 65 for mCRC)
-  # - Utility scenario (Ramsey base-case vs. population-norm adjusted)
-  #
-  # RAMSEY BASE-CASE:
-  # - Uses directly reported Ramsey (2010) utilities: u_PFS = 0.85, u_PD = 0.65
-  # - Source: Ramsey SD, et al. Quality of life in survivors of colorectal
-  #   cancer. Cancer. 2000;88(6):1294-1303.
-  #
-  # POPULATION-NORM ADJUSTED:
-  # - Adjusts Ramsey utilities to country-specific population norms
-  # - Uses EQ-5D population norms from Szende et al. (2014)
-  # - Calculates multipliers to scale mCRC utilities to local baseline
-  # - Preserves relative difference between PFS and PD states
-  # - Rationale: Accounts for cultural differences in utility elicitation
-  #=============================================================================
-
-  cat("\n")
-  cat("Obtaining utilities for scenario: ", utility_scenario, "\n", sep = "")
-
-  utility_result <- get_utility_scenario(
-    country          = country_name,
-    age              = patient_age,
-    utility_scenario = utility_scenario,
-    df_popnorm       = df_popnorm  # Must exist in global environment
-  )
-
-  # Extract utilities from returned list
-  u_F_country <- utility_result$u_PFS  # PFS utility
-  u_P_country <- utility_result$u_PD   # PD utility
-
-  cat("u_PFS (PFS state): ", round(u_F_country, 4), "\n", sep = "")
-  cat("u_PD (PD state):   ", round(u_P_country, 4), "\n", sep = "")
-  cat("Method:            ", utility_result$method, "\n", sep = "")
-
-  #=============================================================================
-  # STEP 3: BUILD COMPLETE PARAMETER LIST
-  #=============================================================================
-  # Construct l_params_all by combining:
-  # 1. Country-specific parameters (from STEP 1)
-  # 2. Scenario-specific utilities (from STEP 2)
-  # 3. Global parameters (defined earlier in main document)
-  #
-  # IMPORTANT: All global parameters must be defined in the environment
-  # before calling this function
-  #=============================================================================
-
-  cat("\n")
-  cat("Building parameter list...\n")
-
-  l_params_all_country <- list(
-    # Hazard ratios (treatment effects on PFS and OS)
-    # -----------------------------------------------
-    HR_FP_Exp = HR_FP_Exp,  # PFS hazard ratio (experimental vs. SoC)
-    HR_FP_SoC = HR_FP_SoC,  # PFS hazard ratio (SoC vs. reference, = 1)
-    HR_PD_Exp = HR_PD_Exp,  # OS hazard ratio (experimental vs. SoC)
-    HR_PD_SoC = HR_PD_SoC,  # OS hazard ratio (SoC vs. reference, = 1)
-    P_OSD_SoC = P_OSD_SoC,  # Probability of death in PD state (SoC)
-    P_OSD_Exp = P_OSD_Exp,  # Probability of death in PD state (Exp)
-
-    # Adverse event probabilities (per cycle)
-    # ----------------------------------------
-    # Standard treatment (SoC) in PFS state:
-    p_FA1_STD = p_FA1_STD,   # AE1 probability - neutropenia
-    p_FA2_STD = p_FA2_STD,   # AE2 probability - diarrhea
-    p_FA3_STD = p_FA3_STD,   # AE3 probability - nausea/vomiting
-    # Experimental treatment (Exp) in PFS state:
-    p_FA1_EXPR = p_FA1_EXPR, # AE1 probability
-    p_FA2_EXPR = p_FA2_EXPR, # AE2 probability
-    p_FA3_EXPR = p_FA3_EXPR, # AE3 probability
-    # FOLFIRI treatment in PD state:
-    p_OSA1_FOLFIRI = p_OSA1_FOLFIRI, # AE1 probability
-    p_OSA2_FOLFIRI = p_OSA2_FOLFIRI, # AE2 probability
-    p_OSA3_FOLFIRI = p_OSA3_FOLFIRI, # AE3 probability
-
-    # Country-specific costs
-    # ----------------------
-    administration_cost = administration_cost_country,
-    c_PFS_Folfox = c_PFS_Folfox_country,
-    c_PFS_Bevacizumab = c_PFS_Bevacizumab_country,
-    c_OS_Folfiri = c_OS_Folfiri_country,
-    subtyping_test_cost = subtyping_test_cost_country,
-    c_AE1 = c_AE1_country,
-    c_AE2 = c_AE2_country,
-    c_AE3 = c_AE3_country,
-    c_D = c_D,  # Death state cost (global, = 0)
-
-    # Scenario-specific utilities
-    # ---------------------------
-    u_F = u_F_country,  # Utility in PFS state
-    u_P = u_P_country,  # Utility in PD state
-    u_D = u_D,          # Utility in death state (= 0)
-
-    # Adverse event disutilities
-    # --------------------------
-    # Percentage reduction in utility when AE occurs
-    AE1_DisUtil = AE1_DisUtil,
-    AE2_DisUtil = AE2_DisUtil,
-    AE3_DisUtil = AE3_DisUtil,
-
-    # Country-specific discount rates (daily)
-    # ---------------------------------------
-    d_e = d_e_country,  # Discount rate for effects (QALYs)
-    d_c = d_c_country,  # Discount rate for costs
-
-    # Model structure parameters
-    # --------------------------
-    n_cycle = n_cycle,  # Number of cycles (143 = ~5.5 years)
-    t_cycle = t_cycle   # Cycle length in days (14 = 2 weeks)
-  )
-
-  #=============================================================================
-  # STEP 4: RUN THE MARKOV MODEL
-  #=============================================================================
-  # Call oncologySemiMarkov() with complete parameter list
-  # This function:
-  # 1. Reconstructs time-dependent transition probabilities from survival curves
-  # 2. Applies hazard ratios to modify probabilities by strategy
-  # 3. Runs the cohort trace through all cycles
-  # 4. Accumulates costs and QALYs with discounting
-  # 5. Calculates incremental metrics and ICER
-  #
-  # Uses survival curve coefficients from global environment
-  # (e.g., coef_weibull_shape_SoC, coef_weibull_scale_SoC)
-  #=============================================================================
-
-  cat("Running oncologySemiMarkov model...\n")
-
-  result <- oncologySemiMarkov(
-    l_params_all = l_params_all_country,
-    n_wtp = n_wtp_country,
-    curve_choice = curve_choice_param
-  )
-
-  cat("Model run completed.\n")
-
-  #=============================================================================
-  # STEP 5: EXTRACT AND STRUCTURE RESULTS
-  #=============================================================================
-  # The oncologySemiMarkov() function returns a list with:
-  # - $Cost: vector of total costs by strategy (SoC, Exp)
-  # - $Effect: vector of total QALYs by strategy (SoC, Exp)
-  # - $ICER: incremental cost-effectiveness ratio
-  # - $NMB: net monetary benefit at specified WTP threshold
-  #
-  # Extract and calculate all key metrics
-  #=============================================================================
-
-  # Extract costs and effects by strategy
-  cost_SoC <- result$Cost[1]   # Total cost for standard of care
-  cost_Exp <- result$Cost[2]   # Total cost for experimental (bevacizumab)
-  qaly_SoC <- result$Effect[1] # Total QALYs for standard of care
-  qaly_Exp <- result$Effect[2] # Total QALYs for experimental
-
-  # Calculate incremental metrics
-  # Incremental cost = Cost_Exp - Cost_SoC
-  # Can be positive (treatment is more expensive) or negative (cost-saving)
-  inc_cost <- cost_Exp - cost_SoC
-
-  # Incremental QALYs = QALY_Exp - QALY_SoC
-  # Expect positive for effective treatment (more QALYs gained)
-  inc_qaly <- qaly_Exp - qaly_SoC
-
-  # Extract ICER and NMB from model output
-  # ICER = Incremental cost per QALY gained
-  # If ICER < WTP threshold, treatment is cost-effective
-  icer_value <- result$ICER
-
-  # Net Monetary Benefit (NMB) = (Inc_QALY × WTP) - Inc_Cost
-  # Positive NMB indicates cost-effective treatment at given WTP
-  nmb_value <- result$NMB
-
-  # Print summary
-  cat("\n")
-  cat("RESULTS SUMMARY:\n")
-  cat("----------------\n")
-  cat("Cost (SoC):       €", format(round(cost_SoC, 2), big.mark=","), "\n", sep = "")
-  cat("Cost (Exp):       €", format(round(cost_Exp, 2), big.mark=","), "\n", sep = "")
-  cat("QALYs (SoC):      ", round(qaly_SoC, 4), "\n", sep = "")
-  cat("QALYs (Exp):      ", round(qaly_Exp, 4), "\n", sep = "")
-  cat("Incremental cost: €", format(round(inc_cost, 2), big.mark=","), "\n", sep = "")
-  cat("Incremental QALY: ", round(inc_qaly, 4), "\n", sep = "")
-  cat("ICER:             €", format(round(icer_value, 2), big.mark=","), " per QALY\n", sep = "")
-  cat("NMB:              €", format(round(nmb_value, 2), big.mark=","), "\n", sep = "")
-  cat("========================================================================\n")
-
-  #=============================================================================
-  # STEP 6: RETURN STRUCTURED RESULTS
-  #=============================================================================
-  # Return single-row data frame for easy row-binding across countries
-  #=============================================================================
-
-  return(data.frame(
-    country = country_name,
-    utility_scenario = utility_scenario,
-    u_PFS = u_F_country,
-    u_PD = u_P_country,
-    cost_SoC = cost_SoC,
-    cost_Exp = cost_Exp,
-    qaly_SoC = qaly_SoC,
-    qaly_Exp = qaly_Exp,
-    inc_cost = inc_cost,
-    inc_qaly = inc_qaly,
-    icer = icer_value,
-    nmb = nmb_value,
-    n_wtp = n_wtp_country,
-    stringsAsFactors = FALSE
-  ))
-}
-
-cat("\n")
-cat("Helper function run_country_analysis() defined successfully.\n")
-cat("\n")
+# NOTE: The scenario analysis chunk (added later in this document) will run
+#       BOTH scenarios automatically for comparison and write results to CSV.
+#       This flag only controls which scenario is used for the main model run.
 
 
 #===============================================================================
-# MAIN ANALYSIS: RUN ALL COUNTRIES
-#===============================================================================
-#
-# HEALTH-ECONOMIC RATIONALE:
-# --------------------------
-# This section runs the base-case CEA for all three countries automatically.
-# Previously, users had to manually comment/uncomment country-specific parameter
-# blocks. This automated approach:
-#
-# 1. ELIMINATES MANUAL EDITING: No commenting/uncommenting required
-# 2. ENSURES CONSISTENCY: All countries use identical model structure
-# 3. IMPROVES REPRODUCIBILITY: Results regenerated programmatically
-# 4. FACILITATES COMPARISON: Results automatically combined for easy review
-# 5. REDUCES ERRORS: No risk of running wrong country parameters
-#
-# The base-case analysis remains unchanged for each country. Only country-
-# specific inputs (costs, discount rates, WTP thresholds, population norms)
-# differ across jurisdictions.
-#
-# UTILITY SCENARIO SELECTION:
-# ---------------------------
-# The utility_scenario_main flag controls which utility values are used:
-#
-# - "ramsey_basecase": Ramsey (2010) utilities directly (u_PFS = 0.85, u_PD = 0.65)
-#   This is the PRIMARY base case reported in the manuscript.
-#
-# - "population_norm_adjusted": Adjusts Ramsey utilities to country-specific
-#   population norms using EQ-5D data from Szende et al. (2014)
-#   This is a SCENARIO ANALYSIS to explore cultural differences.
-#
-# NOTE: The scenario analysis chunk at the end of this document will run
-#       BOTH scenarios for all countries regardless of this setting.
-#       This flag only controls which scenario is used for the main model
-#       outputs (plots, tables, detailed sensitivity analyses, etc.).
-#
+# APPLY UTILITY SCENARIO SELECTION
 #===============================================================================
 
-# Set utility scenario for main analysis
-# ---------------------------------------
-# OPTIONS: "ramsey_basecase" or "population_norm_adjusted"
-utility_scenario_main <- "ramsey_basecase"
-
-cat("\n")
-cat("================================================================================\n")
-cat("MAIN COUNTRY ANALYSIS\n")
-cat("================================================================================\n")
-cat("Utility scenario: ", utility_scenario_main, "\n", sep = "")
-cat("This analysis will run the model for Ireland, Germany, and Spain.\n")
-cat("Results will be combined into a single data frame for comparison.\n")
-cat("================================================================================\n")
-
-# Define countries to analyze
-# ---------------------------
-countries_to_analyze <- c("Ireland", "Germany", "Spain")
-
-# Run analysis for all countries
-# -------------------------------
-# Use lapply() to iterate over countries and call run_country_analysis()
-# The function returns a single-row data frame for each country
-main_results_list <- lapply(countries_to_analyze, function(ctry) {
-  run_country_analysis(
-    country_name = ctry,
-    utility_scenario = utility_scenario_main,
-    patient_age = 65,  # Representative age for mCRC patients
-    curve_choice_param = "weibull"  # Use Weibull as base case
-  )
-})
-
-# Combine results into single data frame
-# ---------------------------------------
-# Stack single-row data frames into one multi-row data frame
-main_results_df <- do.call(rbind, main_results_list)
-rownames(main_results_df) <- main_results_df$country
-
-cat("\n")
-cat("================================================================================\n")
-cat("COMBINED RESULTS FOR ALL COUNTRIES\n")
-cat("================================================================================\n")
-print(main_results_df, row.names = FALSE)
-cat("================================================================================\n")
-
-#===============================================================================
-# SAVE MAIN RESULTS TO CSV
-#===============================================================================
-# Write combined results to CSV for easy review and manuscript inclusion
-#===============================================================================
-
-# Create output directory if needed
-if (!dir.exists("output")) {
-  dir.create("output", recursive = TRUE)
-}
-
-# Define output file path
-main_results_file <- paste0("output/Main_Country_Results_",
-                            utility_scenario_main, ".csv")
-
-# Write to CSV
-write.csv(main_results_df, file = main_results_file, row.names = FALSE)
-
-cat("\n")
-cat("Main results saved to: ", main_results_file, "\n")
-cat("\n")
-
-#===============================================================================
-# SET VARIABLES FOR DOWNSTREAM ANALYSES (BACKWARD COMPATIBILITY)
-#===============================================================================
+# IMPLEMENTATION LOGIC:
+# ---------------------
+# 1. Call get_utility_scenario() with current country_name and patient age
+# 2. Extract u_PFS and u_PD from the returned list
+# 3. Override u_F and u_P (defined earlier as Ramsey values)
+# 4. Print diagnostic information for transparency
 #
-# IMPORTANT: Many downstream code chunks (OWSA, TWSA, PSA, plots) expect
-# certain variables to be defined in the environment:
-# - country_name, n_wtp
-# - c_PFS_Folfox, c_PFS_Bevacizumab, c_OS_Folfiri, etc.
-# - d_c, d_e
-# - u_F, u_P
-#
-# For backward compatibility with existing code that hasn't been refactored yet,
-# we set these variables to the FIRST country's values (Ireland by default).
-# This allows existing sensitivity analysis chunks to run without modification.
-#
-# FUTURE: Sensitivity analyses should also be wrapped in functions/loops
-#         to run for all countries automatically.
-#
-#===============================================================================
+# RESULT:
+# -------
+# - If utility_scenario = "ramsey_basecase":
+#     u_F and u_P remain unchanged (0.85, 0.65)
+# - If utility_scenario = "population_norm_adjusted":
+#     u_F and u_P are replaced with country/age-adjusted values
 
-cat("Setting environment variables for downstream analyses...\n")
-cat("Using Ireland as default for existing sensitivity analysis chunks.\n")
-cat("(Future refactoring will loop sensitivity analyses over all countries.)\n")
-
-# Set default country for downstream
-default_country_for_downstream <- "Ireland"
-
-# Assign country-specific variables based on default country
-# (Duplicates logic in run_country_analysis for environment variables)
-if (default_country_for_downstream == "Ireland") {
-  country_name <- "Ireland"
-  c_PFS_Folfox <- 157.77
-  c_PFS_Bevacizumab <- 1425.84
-  c_OS_Folfiri <- 167.10
-  administration_cost <- 406.50
-  subtyping_test_cost <- 400
-  c_AE1 <- 3485.23
-  c_AE2 <- 1792.82
-  c_AE3 <- 502.69
-  n_wtp <- 45000
-  country_discount_rate <- 0.04
-} else if (default_country_for_downstream == "Germany") {
-  country_name <- "Germany"
-  c_PFS_Folfox <- ((1406.37 / 30) * 14)
-  c_PFS_Bevacizumab <- ((3252.19 / 30) * 14)
-  c_OS_Folfiri <- ((1442.70 / 30) * 14)
-  administration_cost <- 1927.72
-  subtyping_test_cost <- 400
-  c_AE1 <- 4188.31
-  c_AE2 <- 1982.68
-  c_AE3 <- 1307.72
-  n_wtp <- 78871
-  country_discount_rate <- 0.03
-} else if (default_country_for_downstream == "Spain") {
-  country_name <- "Spain"
-  c_PFS_Folfox <- 323.39
-  c_PFS_Bevacizumab <- 1399.33
-  c_OS_Folfiri <- 147.31
-  administration_cost <- 332.39
-  subtyping_test_cost <- 400
-  c_AE1 <- 5710.97
-  c_AE2 <- 305.55
-  c_AE3 <- 35.11
-  n_wtp <- 30000
-  country_discount_rate <- 0.03
-}
-
-# Convert discount rate to daily and set utilities from scenario
-d_c <- country_discount_rate / 365
-d_e <- country_discount_rate / 365
-
-# Get utilities for the selected scenario and default country
-# This ensures u_F and u_P are set correctly for downstream chunks
+# Define patient age for population norm lookup
+# ----------------------------------------------
 patient_age <- 65
-utility_result <- get_utility_scenario(
-  country = country_name,
-  age = patient_age,
-  utility_scenario = utility_scenario_main,
-  df_popnorm = df_popnorm
-)
-u_F <- utility_result$u_PFS
-u_P <- utility_result$u_PD
+# Typical age for mCRC diagnosis is 60-70 years
+# We use 65 as a representative value for all countries
+# This matches the reference age used for multiplier calculation
 
-cat("Environment variables set for country: ", country_name, "\n")
-cat("u_PFS: ", round(u_F, 4), ", u_PD: ", round(u_P, 4), "\n", sep = "")
-cat("Downstream sensitivity analyses will use these values.\n")
+# Call get_utility_scenario() to obtain utilities for selected scenario
+# ----------------------------------------------------------------------
+utility_result <- get_utility_scenario(
+  country          = country_name,        # Set by active country block ("Ireland", "Germany", or "Spain")
+  age              = patient_age,          # Representative patient age (65)
+  utility_scenario = utility_scenario,     # Scenario flag defined above
+  df_popnorm       = df_popnorm           # Population norm data (loaded earlier)
+)
+# Returns a list with elements:
+#   u_PFS, u_PD (the utilities to use)
+#   method, source (metadata describing the approach)
+#   U_ref, U_pop, mean_PFS_mcrc, mean_PD_mcrc, mult_PFS_mcrc, mult_PD_mcrc (for population_norm_adjusted scenario)
+
+# Override u_F and u_P with scenario-specific values
+# ---------------------------------------------------
+u_F <- utility_result$u_PFS
+# If ramsey_basecase: u_F = 0.85 (unchanged)
+# If population_norm_adjusted: u_F = U_pop_country × mult_PFS_mcrc (country/age-specific)
+
+u_P <- utility_result$u_PD
+# If ramsey_basecase: u_P = 0.65 (unchanged)
+# If population_norm_adjusted: u_P = U_pop_country × mult_PD_mcrc (country/age-specific)
+
+# Print diagnostic information for transparency
+# ----------------------------------------------
+cat("\n")
+cat("====================================================================\n")
+cat("UTILITY SCENARIO APPLIED\n")
+cat("====================================================================\n")
+cat("Scenario:      ", utility_scenario, "\n", sep = "")
+# Prints which scenario is active
+
+cat("Country:       ", country_name, "\n", sep = "")
+# Prints which country is being analyzed
+
+cat("Patient age:   ", patient_age, "\n", sep = "")
+# Prints the age used for population norm lookup
+
+cat("u_PFS (PFS):   ", round(u_F, 4), "\n", sep = "")
+# Prints the PFS utility that will be used in the model (4 decimal places)
+
+cat("u_PD (PD):     ", round(u_P, 4), "\n", sep = "")
+# Prints the PD utility that will be used in the model (4 decimal places)
+
+cat("Method:        ", utility_result$method, "\n", sep = "")
+# Prints description of the method used (e.g., "Ramsey base case (no adjustment)")
+
+cat("Source:        ", utility_result$source, "\n", sep = "")
+# Prints citation/source for the utilities
+
+# If population_norm_adjusted scenario, print additional details
+# ---------------------------------------------------------------
+if (!is.null(utility_result$U_pop) && !is.na(utility_result$U_pop)) {
+  # Check if U_pop exists and is not NA (only present in population_norm_adjusted scenario)
+
+  cat("\nPOPULATION NORM ADJUSTMENT DETAILS:\n")
+  cat("-----------------------------------\n")
+
+  cat("Ref country:   ", utility_result$ref_country, " (age ", utility_result$ref_age, ")\n", sep = "")
+  # Prints reference country used for multiplier calculation (England (UK), age 65)
+
+  cat("U_ref (UK 65): ", round(utility_result$U_ref, 4), "\n", sep = "")
+  # Prints UK population norm at age 65 (denominator for multipliers)
+
+  cat("U_pop (target):", round(utility_result$U_pop, 4), "\n", sep = "")
+  # Prints target country population norm at specified age
+
+  cat("mean_PFS_mcrc: ", round(utility_result$mean_PFS_mcrc, 4), "\n", sep = "")
+  # Prints mean PFS utility from mCRC literature
+
+  cat("mean_PD_mcrc:  ", round(utility_result$mean_PD_mcrc, 4), "\n", sep = "")
+  # Prints mean PD utility from mCRC literature
+
+  cat("mult_PFS_mcrc: ", round(utility_result$mult_PFS_mcrc, 4),
+      " (mCRC PFS utility is ", round(utility_result$mult_PFS_mcrc * 100, 1), "% of UK norm)\n", sep = "")
+  # Prints PFS multiplier and interpretation
+
+  cat("mult_PD_mcrc:  ", round(utility_result$mult_PD_mcrc, 4),
+      " (mCRC PD utility is ", round(utility_result$mult_PD_mcrc * 100, 1), "% of UK norm)\n", sep = "")
+  # Prints PD multiplier and interpretation
+
+  cat("\nCALCULATION:\n")
+  cat("u_PFS = U_pop × mult_PFS_mcrc = ", round(utility_result$U_pop, 4),
+      " × ", round(utility_result$mult_PFS_mcrc, 4),
+      " = ", round(u_F, 4), "\n", sep = "")
+  # Shows the calculation step-by-step for transparency
+
+  cat("u_PD  = U_pop × mult_PD_mcrc  = ", round(utility_result$U_pop, 4),
+      " × ", round(utility_result$mult_PD_mcrc, 4),
+      " = ", round(u_P, 4), "\n", sep = "")
+  # Shows the calculation step-by-step for transparency
+}
+
+cat("====================================================================\n")
 cat("\n")
 
-# Build l_params_all for downstream use
-# This recreates the parameter list for the default country
-# Many downstream chunks reference this variable
+# NOTE: This diagnostic output can be silenced by commenting out the cat() statements
+#       if needed for production runs, but is useful for transparency during development
+#       and for demonstrating to reviewers exactly how utilities were calculated.
+
 l_params_all <- list(
   HR_FP_Exp = HR_FP_Exp,
   HR_FP_SoC = HR_FP_SoC,
   HR_PD_Exp = HR_PD_Exp,
   HR_PD_SoC = HR_PD_SoC,
-  P_OSD_SoC = P_OSD_SoC,
+  P_OSD_SoC = P_OSD_SoC,      
   P_OSD_Exp = P_OSD_Exp,
   p_FA1_STD = p_FA1_STD,
   p_FA2_STD = p_FA2_STD,
@@ -5331,28 +4756,35 @@ l_params_all <- list(
   p_OSA2_FOLFIRI = p_OSA2_FOLFIRI,
   p_OSA3_FOLFIRI = p_OSA3_FOLFIRI,
   administration_cost = administration_cost,
+    #ITS FINE TO INCLUDE THE INGRIDENIENTS THAT MAKE UP c_F_SoC, c_F_Exp, c_P, but don't include c_F_SoC, c_F_Exp, c_P themsleves, BECAUSE WE ARE CHANGING WHAT BUILDS THESE COSTS WITH THE INGRIEDIENTS, SO WE DON'T WANT TO CHANGE IT AGAIN HERE ONCE WE'VE CHANGED WHAT BUILDS IT
   c_PFS_Folfox = c_PFS_Folfox,
   c_PFS_Bevacizumab = c_PFS_Bevacizumab,
   c_OS_Folfiri = c_OS_Folfiri,
   subtyping_test_cost  = subtyping_test_cost,
-  c_D       = c_D,
+  c_D       = c_D,    
   c_AE1 = c_AE1,
   c_AE2 = c_AE2,
   c_AE3 = c_AE3,
-  u_F = u_F,
-  u_P = u_P,
-  u_D = u_D,
+  u_F = u_F,   
+  #ITS FINE TO INCLUDE U_F BUT DON'T INCLUDE U_F_SoC, BECAUSE WE ARE CHANGING WHAT BUILDS U_F_SoC WTH U_F AND AE1_DisUtil SO WE DON'T WANT TO CHANGE IT AGAIN HERE ONCE WE'VE CHANGED WHAT BUILDS IT
+  u_P = u_P,   
+  u_D = u_D,  
   AE1_DisUtil = AE1_DisUtil,
   AE2_DisUtil = AE2_DisUtil,
   AE3_DisUtil = AE3_DisUtil,
-  d_e       = d_e,
+  d_e       = d_e,  
   d_c       = d_c,
   n_cycle   = n_cycle,
   t_cycle   = t_cycle
 )
 
-cat("l_params_all created for downstream use.\n")
-cat("\n")
+ 
+# Test function
+
+# Test whether the function works (and generates the same results)
+# Now passing curve_choice to control which parametric distribution is used
+# This allows the function to switch between Weibull (base case) and gamma (scenario)
+oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp, curve_choice = curve_choice)
 
 # OK, so I was wondering why the values reported by the PSA/Tornado plot, differed so significantly to the values found with the baseline Markov model.
 # Reviewing the code, I've determined that the reason for these differences is the manner in which the disutility of adverse events is handled in the function in comparison to the baseline analysis in the R Markdown document.
