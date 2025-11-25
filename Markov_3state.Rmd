@@ -4026,6 +4026,63 @@ u_OS<-u_P-p_OSA1_FOLFIRI*u_AE1_OS*Duration_AE - p_OSA2_FOLFIRI*u_AE2_OS*Duration
 #
 # ------------------------------------------------------------------------------
 
+# SAFETY CHECK: Ensure country-specific parameters are loaded
+# If running chunks individually, automatically load default country parameters
+# to prevent "object not found" errors
+if (!exists("administration_cost") || !exists("c_PFS_Folfox") || !exists("c_PFS_Bevacizumab") || !exists("c_OS_Folfiri")) {
+
+  cat("\n")
+  cat("================================================================================\n")
+  cat("AUTO-LOADING COUNTRY-SPECIFIC PARAMETERS\n")
+  cat("================================================================================\n")
+  cat("Country-specific parameters were not found in the environment.\n")
+  cat("Loading default parameters for Ireland...\n")
+  cat("\n")
+  cat("NOTE: If you intended to analyze a different country (Germany or Spain),\n")
+  cat("      please run the 'COUNTRY-SPECIFIC PARAMETERS' chunk (around line 774)\n")
+  cat("      first and set DEFAULT_COUNTRY to your desired country.\n")
+  cat("================================================================================\n")
+  cat("\n")
+
+  # Check if get_country_params() function exists
+  if (!exists("get_country_params")) {
+    stop("\n\n",
+         "================================================================================\n",
+         "ERROR: get_country_params() function not defined!\n",
+         "================================================================================\n",
+         "The helper function get_country_params() has not been defined yet.\n",
+         "\n",
+         "SOLUTION:\n",
+         "You must first run the 'COUNTRY-SPECIFIC PARAMETERS' chunk\n",
+         "(starting around line 774) which defines this function.\n",
+         "\n",
+         "If knitting the entire document, this error indicates a structural problem.\n",
+         "Please report this as a bug.\n",
+         "================================================================================\n")
+  }
+
+  # Load default Ireland parameters
+  params <- get_country_params("Ireland")
+
+  # Unpack parameters into individual variables
+  country_name            <- params$country_name
+  c_PFS_Folfox           <- params$c_PFS_Folfox
+  c_PFS_Bevacizumab      <- params$c_PFS_Bevacizumab
+  c_OS_Folfiri           <- params$c_OS_Folfiri
+  administration_cost     <- params$administration_cost
+  subtyping_test_cost    <- params$subtyping_test_cost
+  c_AE1                  <- params$c_AE1
+  c_AE2                  <- params$c_AE2
+  c_AE3                  <- params$c_AE3
+  n_wtp                  <- params$n_wtp
+  country_discount_rate      <- params$country_discount_rate
+  country_max_discount_rate  <- params$country_max_discount_rate
+  country_min_discount_rate  <- params$country_min_discount_rate
+
+  cat("Default parameters loaded successfully for:", country_name, "\n")
+  cat("\n")
+}
+
 # c_F_SoC: Cost per cycle in the PFS (progression-free survival) state under
 #          standard of care (FOLFOX-4 regimen)
 #
