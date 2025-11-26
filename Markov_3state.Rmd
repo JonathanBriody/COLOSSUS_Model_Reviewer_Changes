@@ -4124,6 +4124,16 @@ c_F_Exp <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab
 c_P <- c_OS_Folfiri + administration_cost
 
 
+# c_D: Cost per cycle in the Dead state
+#
+# COMPOSITION:
+#   - No costs (patients who are dead incur no further treatment or healthcare costs)
+#
+# This is set to 0 as being in the dead state has no ongoing costs. This is standard
+# practice in health economic modeling.
+c_D <- 0
+
+
 # ==============================================================================
 # ADD EXPECTED ADVERSE EVENT COSTS TO BASE STATE COSTS
 # ==============================================================================
