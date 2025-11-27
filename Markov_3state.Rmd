@@ -5274,14 +5274,15 @@ run_country_analysis <- function(
   # Expect positive for effective treatment (more QALYs gained)
   inc_qaly <- qaly_Exp - qaly_SoC
 
-  # Extract ICER and NMB from model output
+  # Extract ICER from model output
   # ICER = Incremental cost per QALY gained
   # If ICER < WTP threshold, treatment is cost-effective
-  icer_value <- result$ICER
+  # Note: DSAICER is the same for both strategies (it's a ratio), so we take the first value
+  icer_value <- result$DSAICER[1]
 
-  # Net Monetary Benefit (NMB) = (Inc_QALY × WTP) - Inc_Cost
+  # Calculate Net Monetary Benefit (NMB) = (Inc_QALY × WTP) - Inc_Cost
   # Positive NMB indicates cost-effective treatment at given WTP
-  nmb_value <- result$NMB
+  nmb_value <- (inc_qaly * n_wtp_country) - inc_cost
 
   # Print summary
   cat("\n")
