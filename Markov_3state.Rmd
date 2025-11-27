@@ -908,40 +908,32 @@ get_country_params <- function(country) {
 
 
 #===============================================================================
-# SET DEFAULT COUNTRY PARAMETERS
+# LOAD COUNTRY-SPECIFIC PARAMETERS
 #===============================================================================
 #
-# By default, we load Ireland parameters. This ensures that all country-specific
-# variables are defined for downstream chunks that reference them directly
-# (e.g., c_F_SoC <- administration_cost + c_PFS_Folfox).
+# Country-specific parameters are stored in separate files:
+#   - params_Ireland.R
+#   - params_Germany.R
+#   - params_Spain.R
 #
-# TO CHANGE COUNTRY: Modify DEFAULT_COUNTRY below to "Germany" or "Spain"
+# TO CHANGE COUNTRY: Uncomment ONE of the source() lines below and comment the others
 #
-# TO RUN ALL COUNTRIES AUTOMATICALLY: See the utility scenario analysis chunk
-# at the end of this document, which loops through all countries sequentially.
+# Each parameter file defines:
+#   - country_name: Country identifier
+#   - Treatment costs (c_PFS_Folfox, c_PFS_Bevacizumab, c_OS_Folfiri, etc.)
+#   - Adverse event costs (c_AE1, c_AE2, c_AE3)
+#   - Willingness-to-pay threshold (n_wtp)
+#   - Discount rates (country_discount_rate, country_max_discount_rate, country_min_discount_rate)
+#
+# IMPORTANT: All outputs will be saved with country-specific filenames to prevent
+#            overwriting when running multiple countries sequentially.
 #
 #===============================================================================
 
-# Set the default country for this analysis
-DEFAULT_COUNTRY <- "Ireland"
-
-# Load country-specific parameters into workspace
-params <- get_country_params(DEFAULT_COUNTRY)
-
-# Unpack parameters into individual variables
-country_name            <- params$country_name
-c_PFS_Folfox           <- params$c_PFS_Folfox
-c_PFS_Bevacizumab      <- params$c_PFS_Bevacizumab
-c_OS_Folfiri           <- params$c_OS_Folfiri
-administration_cost     <- params$administration_cost
-subtyping_test_cost    <- params$subtyping_test_cost
-c_AE1                  <- params$c_AE1
-c_AE2                  <- params$c_AE2
-c_AE3                  <- params$c_AE3
-n_wtp                  <- params$n_wtp
-country_discount_rate      <- params$country_discount_rate
-country_max_discount_rate  <- params$country_max_discount_rate
-country_min_discount_rate  <- params$country_min_discount_rate
+# Uncomment ONE country (leave the others commented):
+source("params_Ireland.R")
+# source("params_Germany.R")
+# source("params_Spain.R")
 
 # Print confirmation
 cat("\n")
@@ -1161,10 +1153,10 @@ survfit2(Surv(time, status) ~ 1, data = df_TTP) %>% ggsurvfit() +
   labs(
     x = "Days",
     y = "Progression Free survival probability"
-  ) + 
+  ) +
   add_risktable()
 #print(plot)
-ggsave(file.path("output", "Baseline_PFS_Curves.png"), width = 8, height = 4, dpi=600)
+ggsave(file.path("output", paste0("Baseline_PFS_Curves_", country_name, ".png")), width = 8, height = 4, dpi=600)
 #dev.off()
 while (!is.null(dev.list()))  dev.off()
 
@@ -1183,9 +1175,9 @@ survfit2(Surv(time, status) ~ 1, data = df_TTD) %>% ggsurvfit() +
   labs(
     x = "Days",
     y = "Overall survival probability"
-  ) + 
+  ) +
   add_risktable()
-ggsave(file.path("output", "Baseline_OS_Curves.png"), width = 4, height = 4, dpi=600)
+ggsave(file.path("output", paste0("Baseline_OS_Curves_", country_name, ".png")), width = 4, height = 4, dpi=600)
 #png(paste("Baseline_OS_Curves", ".png"))
 #dev.off()
 while (!is.null(dev.list()))  dev.off()
@@ -1957,7 +1949,7 @@ survfit2(Surv(time, status) ~ group, data = df_combined_TTP) %>% ggsurvfit() +
   theme_minimal()
 
 # Save the plot
-ggsave(file.path("output", "Baseline_PFS_Curves_BothEXPANDSOC.png"), width = 8, height = 6, dpi = 600)
+ggsave(file.path("output", paste0("Baseline_PFS_Curves_BothEXPANDSOC_", country_name, ".png")), width = 8, height = 6, dpi = 600)
 
 # Here I update the height of the image to push the title closer to the middle.
 
@@ -2001,7 +1993,7 @@ survfit2(Surv(time, status) ~ group, data = df_combined_TTD) %>% ggsurvfit() +
 # [1]    0  319  638  957 1276 1595 1914 2233 2552 2871
 
 # Save the plot
-ggsave(file.path("output", "Baseline_OS_Curves_BothEXPANDSOC.png"), width = 8, height = 4, dpi = 600)
+ggsave(file.path("output", paste0("Baseline_OS_Curves_BothEXPANDSOC_", country_name, ".png")), width = 8, height = 4, dpi = 600)
 
 # Close any remaining graphics devices
 while (!is.null(dev.list())) dev.off()
@@ -3016,7 +3008,7 @@ v_names_states_updated <- c("First-Line", "Second-Line", "Death")
 v_names_states_updated
 
 # Open a PNG device
-png("Markov_Cohort_Traces.png", width = 8, height = 6,  units = "in", res = 600)
+png(paste0("Markov_Cohort_Traces_", country_name, ".png"), width = 8, height = 6,  units = "in", res = 600)
 
 # res = 600 sets the resolution to 600 DPI, which is higher than the default 300 DPI. You can adjust this value to achieve the desired resolution.
 
@@ -4122,6 +4114,16 @@ c_F_Exp <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab
 # they initially received FOLFOX alone (SoC) or FOLFOX + bevacizumab (Exp). Therefore,
 # c_P is identical for both strategies once patients enter the progressed/OS state.
 c_P <- c_OS_Folfiri + administration_cost
+
+
+# c_D: Cost per cycle in the Dead state
+#
+# COMPOSITION:
+#   - No costs (patients who are dead incur no further treatment or healthcare costs)
+#
+# This is set to 0 as being in the dead state has no ongoing costs. This is standard
+# practice in health economic modeling.
+c_D <- 0
 
 
 # ==============================================================================
@@ -5419,6 +5421,7 @@ if (!dir.exists("output")) {
 
 # Define output file path
 main_results_file <- paste0("output/Main_Country_Results_",
+                            country_name, "_",
                             utility_scenario_main, ".csv")
 
 # Write to CSV
@@ -5747,13 +5750,14 @@ print(comparison_table)
 
 # Save comparison table to CSV for use in paper
 # Write comparison table to CSV file
+weibull_gamma_file <- file.path("output", paste0("Weibull_vs_Gamma_", country_name, ".csv"))
 write.csv(
   comparison_table,
-  file = file.path("output", "Weibull_vs_Gamma_Ireland.csv"),
+  file = weibull_gamma_file,
   row.names = FALSE
 )
 
-cat("\nComparison table saved to: output/Weibull_vs_Gamma_Ireland.csv\n")
+cat("\nComparison table saved to:", weibull_gamma_file, "\n")
 
 # Calculate the difference in ICER between distributions
 # This quantifies the structural uncertainty
