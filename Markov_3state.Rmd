@@ -931,9 +931,9 @@ get_country_params <- function(country) {
 #===============================================================================
 
 # Uncomment ONE country (leave the others commented):
-# source("params_Ireland.R")
+ source("params_Ireland.R")
 # source("params_Germany.R")
- source("params_Spain.R")
+# source("params_Spain.R")
 
 # Print confirmation
 cat("\n")
@@ -5457,7 +5457,7 @@ cat("Using Ireland as default for existing sensitivity analysis chunks.\n")
 cat("(Future refactoring will loop sensitivity analyses over all countries.)\n")
 
 # Set default country for downstream
-default_country_for_downstream <- "Ireland"
+default_country_for_downstream <- country_name
 
 # Assign country-specific variables based on default country
 # (Duplicates logic in run_country_analysis for environment variables)
@@ -10803,7 +10803,7 @@ cat("\nFormatted summary table saved to:", formatted_filename, "\n\n")
 #
 # DEFENSIVE PROGRAMMING RATIONALE:
 # -----------------------------------------------------------------------------
-# We cannot assume all three country analyses have been run. The user may:
+# We cannot assume all three country analyses have been run. If this is someones first time using my code they could easily be:
 # - Still be working through the countries sequentially
 # - Have re-run one country after making changes
 # - Be testing with a subset of countries
