@@ -7319,7 +7319,7 @@ print(paste("Fixed ICER axis limits:", ylim_top10[1], "to", ylim_top10[2]))
 # FUNCTION PARAMETERS WE'RE USING:
 # - owsa: The OWSA results data frame (we use our top 10 subset)
 # - txtsize: Base text size for labels (11 pt is readable)
-# - ylim: Axis limits (our calculated limits with 5% buffer)
+# - ylim: Axis limits (fixed at €100k-€400k for cross-country comparability)
 #
 # Note on axis naming: Due to horizontal orientation, "ylim" in the function
 # actually controls the ICER axis (which displays horizontally).
@@ -7348,10 +7348,10 @@ tornado_plot_top10 <- owsa_tornado(
   # Practical consideration: Must balance readability with space constraints
   txtsize = 11,
 
-  # Apply our calculated axis limits (with 5% buffer)
-  # This ensures appropriate scaling without excessive white space
+  # Apply our fixed axis limits (€100k-€400k for cross-country comparability)
+  # This ensures consistent scaling across all country analyses
   # ylim is a two-element vector: c(minimum, maximum)
-  # Health economic interpretation: Fair, data-driven axis bounds
+  # Health economic interpretation: Standardized bounds for valid comparison
   # Modeling interpretation: Controlling the range of the ICER axis
   # Important: In owsa_tornado's horizontal layout, ylim controls the outcome (ICER)
   # axis, even though it appears horizontally on the page
@@ -7850,7 +7850,7 @@ print(paste("Unlimited top 10 tornado plot saved successfully as:", file_unlimit
 #
 #   This provides:
 #   - Clear, focused visualization (not cluttered)
-#   - Appropriate axis scaling (with 5% buffer)
+#   - Appropriate axis scaling (fixed €100k-€400k range)
 #   - Self-contained with abbreviations footnote
 #   - Publication-quality resolution (600 DPI)
 #
