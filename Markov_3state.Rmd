@@ -7217,86 +7217,71 @@ print(paste("Expected rows: 10 parameters × 100 samples = 1000"))
 # - Some other data processing error
 
 # ============================================================================
-# STEP 4: DETERMINE SENSIBLE AXIS LIMITS FOR THE TORNADO PLOT
+# STEP 4: SET FIXED AXIS LIMITS FOR CONSISTENT TORNADO PLOT COMPARISON
 # ============================================================================
 #
-# HEALTH ECONOMIC RATIONALE FOR CUSTOM AXIS LIMITS:
+# HEALTH ECONOMIC RATIONALE FOR FIXED AXIS LIMITS:
 # -----------------------------------------------------------------------------
-# Appropriate axis scaling is critical for accurate interpretation of
-# sensitivity analysis results. Poorly chosen limits can:
+# For multi-country comparative analysis, using consistent axis scales across
+# all tornado plots is critical for valid visual comparison. Fixed limits allow:
 #
-# MISLEAD: Too narrow limits exaggerate small differences
-# OBSCURE: Too wide limits make real differences appear trivial
-# DISTORT: Asymmetric limits can create false impressions of direction
+# COMPARABILITY: Identical axis scales enable direct visual comparison across
+#                countries and analyses
+# CONTEXT: A fixed €200k-€400k range provides appropriate policy context since
+#          it spans well beyond all three countries' WTP thresholds
+# FOCUS: Constraining the range to policy-relevant ICERs improves readability
+# STANDARDIZATION: Consistent scaling is a best practice for comparative CEA
 #
-# In health economic reporting, we must ensure that:
-# - The magnitude of parameter influence is accurately represented
-# - Readers can make valid comparisons between parameters
-# - The plot is not manipulated (intentionally or not) to support a conclusion
-# - There's enough context (white space) to see the data clearly
+# In health economic reporting, when comparing across countries or scenarios,
+# we must ensure that:
+# - Visual comparisons are valid (same scales)
+# - The range encompasses the decision-relevant ICER values
+# - The magnitude of parameter influence can be compared across analyses
+# - The chosen range is justified and transparent
 #
-# BEST PRACTICE APPROACH:
+# FIXED RANGE APPROACH:
 # -----------------------------------------------------------------------------
-# We calculate axis limits based on the ACTUAL data range for our top 10
-# parameters, then add a small buffer for visual clarity:
+# We set axis limits to a fixed €200k-€400k range for all tornado plots:
 #
-# 1. Find the minimum ICER value across all top 10 parameters
-# 2. Find the maximum ICER value across all top 10 parameters
-# 3. Calculate the range = max - min
-# 4. Add 5% buffer on each side (standard practice in data visualization)
+# 1. Lower bound: €200,000 per QALY
+# 2. Upper bound: €400,000 per QALY
+# 3. Range spans all country WTP thresholds (Ireland: €45k, Germany: €78.9k, Spain: €30k)
+# 4. Focuses on clinically and policy-relevant ICER values
 #
 # This ensures:
-# - All data points are visible (no truncation)
-# - Differences are accurately portrayed (no distortion)
-# - The plot is readable (bars don't touch axis edges)
-# - The approach is defensible and reproducible
+# - Direct visual comparability across all analyses
+# - Policy-relevant context for decision-makers
+# - Consistent presentation standards
+# - Transparent and reproducible approach
 #
 # MODELING APPROACH:
 # -----------------------------------------------------------------------------
-# We use R's min() and max() functions on the outcome_val column of our
-# filtered dataset, then apply simple arithmetic to calculate buffered limits.
+# We set ylim_top10 to a fixed vector c(200000, 400000) rather than
+# calculating data-driven limits.
 
-# Calculate the minimum ICER value in the top 10 parameter subset
-# This is the lowest ICER achieved by any parameter at any point in its range
-# Health economic interpretation: The most optimistic ICER under parameter uncertainty
-# Modeling interpretation: The left edge of our tornado plot data
-min_icer_top10 <- min(DSAICER_top10$outcome_val)
-
-# Calculate the maximum ICER value in the top 10 parameter subset
-# This is the highest ICER achieved by any parameter at any point in its range
-# Health economic interpretation: The most pessimistic ICER under parameter uncertainty
-# Modeling interpretation: The right edge of our tornado plot data
-max_icer_top10 <- max(DSAICER_top10$outcome_val)
-
-# Calculate the 5% buffer amount
-# Buffer = 5% of the total range
-# This provides breathing room so bars don't touch the axis edges
-# 5% is a standard convention in data visualization - small enough not to distort,
-# large enough to provide visual clarity
-# Health economic interpretation: Maintaining visual honesty in reporting
-# Modeling interpretation: Improving plot aesthetics without changing the message
-buffer <- 0.05 * (max_icer_top10 - min_icer_top10)
-
-# Create the axis limits by subtracting buffer from min and adding to max
-# This creates a two-element vector: c(lower_limit, upper_limit)
-# The c() function combines values into a vector
-# Health economic interpretation: Setting fair, data-driven axis bounds
-# Modeling interpretation: Defining the ylim parameter for owsa_tornado
+# Set fixed axis limits for consistent ICER range visualization
+# We're constraining the visualization to show ICERs within the €200k-€400k range
+# This provides a standardized comparison scale across all tornado plots
+# Health economic interpretation: We're establishing a consistent scale that:
+# 1. Spans well beyond the WTP thresholds for all three countries analyzed:
+#    - Ireland: €45,000
+#    - Germany: €78,871
+#    - Spain: €30,000
+# 2. Focuses on the clinically and policy-relevant ICER range
+# 3. Enables direct visual comparison across different analyses
+# Modeling interpretation: Setting explicit ylim bounds for owsa_tornado
 # Note: "ylim" is the parameter name in owsa_tornado, but due to horizontal
 # orientation, this actually controls the ICER axis (which appears horizontal/x)
-ylim_top10 <- c(min_icer_top10 - buffer, max_icer_top10 + buffer)
+ylim_top10 <- c(200000, 400000)
 
-# Display the calculated limits for review
+# Display the fixed limits being used
 # This transparency is important for reproducibility and validation
-# Reviewers or users can verify that our axis choices are appropriate
 # Health economic value: Transparent reporting of visualization decisions
-# Practical value: Helps identify if limits look unreasonable (e.g., negative ICER)
-print(paste("ICER range for top 10:", round(min_icer_top10), "to", round(max_icer_top10)))
-print(paste("Axis limits with 5% buffer:", round(ylim_top10[1]), "to", round(ylim_top10[2])))
+# Practical value: Ensures consistency across all tornado plot outputs
+print(paste("Fixed ICER axis limits:", ylim_top10[1], "to", ylim_top10[2]))
 
-# Example output might be:
-# "ICER range for top 10: 125000 to 215000"
-# "Axis limits with 5% buffer: 120500 to 219500"
+# Expected output:
+# "Fixed ICER axis limits: 200000 to 400000"
 
 # ============================================================================
 # STEP 5: CREATE TORNADO PLOT FOR TOP 10 PARAMETERS
@@ -7686,84 +7671,89 @@ print(paste("Top 10 tornado plot saved successfully as:", filename_top10))
 # - Filename: output/tornado_top10_<country>.png (e.g., output/tornado_top10_ireland.png)
 
 # ============================================================================
-# STEP 9: CREATE VERSION WITHOUT AXIS LIMITS (FOR COMPARISON)
+# STEP 9: CREATE SECOND TORNADO PLOT VERSION (KEPT FOR CONSISTENCY)
 # ============================================================================
 #
-# HEALTH ECONOMIC RATIONALE FOR CREATING AN "UNLIMITED" VERSION:
+# HEALTH ECONOMIC NOTE ON DUPLICATE VERSIONS:
 # -----------------------------------------------------------------------------
-# In data visualization, axis limits can significantly affect interpretation.
-# While we've calculated sensible limits based on the data, it's good practice
-# to also create a version without custom limits to ensure we haven't:
+# This section creates a second tornado plot with the same specifications as
+# the primary plot. Originally, this "unlimited" version was created to show
+# the full data range without custom axis limits for comparison purposes.
 #
-# 1. HIDDEN IMPORTANT CONTEXT: Custom limits might crop out relevant range
-# 2. DISTORTED COMPARISONS: Limited axes might exaggerate or minimize differences
-# 3. INTRODUCED BIAS: Axis choices could (even unintentionally) favor a conclusion
+# CURRENT APPROACH (UPDATED):
+# -----------------------------------------------------------------------------
+# We now use fixed axis limits (€200k-€400k) for ALL tornado plots to ensure:
+# - Consistent visual scaling across countries and analyses
+# - Valid direct comparison between different tornado plots
+# - Policy-relevant ICER range that spans all country WTP thresholds
 #
-# By creating both versions, we:
-# - Can visually compare them to verify our limits are appropriate
-# - Provide transparency in our visualization choices
-# - Have both options available for different presentation contexts
-# - Follow best practices in data visualization ethics
+# Both the primary tornado plot and this "unlimited" version now use the same
+# fixed limits (ylim_top10). This section is kept for:
+# - Backward compatibility with existing workflow
+# - Flexibility to create alternative versions if needed in future
+# - Documentation of previous visualization approach
 #
-# PRACTICAL USE CASES:
-# - LIMITED VERSION: Use in publications where space is constrained and you want
-#   to focus reader attention on the relevant range
-# - UNLIMITED VERSION: Use in appendices, technical reports, or when reviewers
-#   request to see the full range
+# PRACTICAL USE:
+# - Both versions are now identical in terms of axis scaling
+# - Users can modify either version independently if alternative presentations
+#   are needed for specific audiences
 #
 # MODELING APPROACH:
 # -----------------------------------------------------------------------------
-# We create a second tornado plot identical to the first, except we omit the
-# ylim parameter, allowing owsa_tornado to automatically determine axis limits.
+# We create a second tornado plot identical to the first, including the same
+# fixed axis limits (ylim_top10).
 
-# Create another tornado plot without custom axis limits
-# This is identical to our previous plot except we don't specify ylim
-# The owsa_tornado function will automatically determine appropriate limits
-# Health economic interpretation: Transparency in visualization choices
-# Modeling interpretation: Allowing automatic axis scaling for comparison
+# Create another tornado plot with the same fixed axis limits
+# This version was historically called "unlimited" but now uses same limits
+# Health economic interpretation: Maintaining consistent €200k-€400k scale
+# Modeling interpretation: Using identical specifications to primary plot
 unlimited_tornado_plot_top10 <- owsa_tornado(
 
   # Use the same filtered data (top 10 parameters only)
-  # This ensures we're comparing apples to apples - same parameters, different scaling
-  # Health economic interpretation: Consistent data, different presentation
+  # This ensures we're comparing apples to apples - same parameters, same scaling
+  # Health economic interpretation: Consistent data and consistent presentation
   owsa = DSAICER_top10,
 
   # Use the same text size for consistency
-  # This ensures any visual differences are due to axis scaling, not text size
-  # Health economic best practice: Control variables when comparing visualizations
-  txtsize = 11
+  # This ensures visual consistency across all tornado plot variants
+  # Health economic best practice: Standardized formatting for comparability
+  txtsize = 11,
 
-  # Note: No ylim specified here - this is the key difference
-  # owsa_tornado will automatically choose limits based on the data
-  # Typically this will be slightly wider than our custom limits
-  # Health economic interpretation: Letting the software choose "neutral" limits
+  # Apply the same fixed axis limits as the primary tornado plot
+  # This ensures both versions have identical scaling for direct comparison
+  # ylim is a two-element vector: c(minimum, maximum)
+  # Health economic interpretation: Maintaining consistent €200k-€400k scale
+  # Modeling interpretation: Using the same ylim_top10 variable defined earlier
+  # Note: Despite the name "unlimited", we now apply fixed limits for consistency
+  ylim = ylim_top10
 )
 
-# Add the same axis label
-# We want everything to be identical except the axis limits
-# This allows fair comparison between the two versions
+# Add the same axis labels
+# Both versions now have identical specifications including axis limits
 # Health economic interpretation: Consistent labeling for comparability
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
   # Label both axes
-  # Identical to the limited version
-  labs(y = "ICER (€ per QALY)", x = "Parameter")
+  # Identical to the primary version
+  labs(x = "ICER (€ per QALY)", y = "Parameter")
 
-# Create a title indicating this is the unlimited scale version
-# We add "Unlimited Scale" to the title to distinguish it from the limited version
-# This makes it clear which version is which when comparing files
+# Create a title for this version
+# We retain "Unlimited Scale" in the title for backward compatibility
+# even though both versions now use the same fixed €200k-€400k limits
+# This maintains consistency with existing file naming conventions
 # Health economic interpretation: Clear labeling of visualization variants
 plot_title_unlimited_top10 <- paste(
   "Tornado Plot - Top 10 Most Influential Parameters (",
   country_name[1],
-  ") - Unlimited Scale",  # This is the key addition
+  ") - Unlimited Scale",  # Note: Both versions now use same fixed limits
   sep = ""
 )
 
 # Add the title and apply the same formatting
-# Everything should match the limited version except the title text
+# Both versions now match in all specifications (data, limits, formatting)
+# except for the title text which distinguishes them for file naming
 # Health economic best practice: Consistent formatting across related figures
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
-  # Add the modified title
+  # Add the title
   ggtitle(plot_title_unlimited_top10) +
   # Apply identical theme settings
   theme(
@@ -7774,7 +7764,7 @@ unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
   )
 
 # Add the same abbreviations caption
-# The footnote should be identical to the limited version
+# The footnote is identical to the primary version
 # This ensures both plots are equally self-explanatory
 # Health economic interpretation: Consistent accessibility across variants
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
