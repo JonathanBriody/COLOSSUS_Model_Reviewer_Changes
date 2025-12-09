@@ -7197,18 +7197,20 @@ DSAICER_top10 <- DSAICER %>%
 
   # Keep only rows where the parameter column matches one of our top 10
   # The %in% operator returns TRUE if parameter is in top10_parameters vector
-  # This will keep all 100 samples for each of the 10 parameters
+  # This will keep all 200 rows per parameter (100 samples × 2 strategies)
   # Health economic interpretation: Retaining full detail for influential parameters
   # Modeling interpretation: Subsetting the data frame for focused visualization
   filter(parameter %in% top10_parameters)
 
 # Verify we have the expected number of rows
-# With 10 parameters and 100 samples each (nsamp=100), we expect 1000 rows
+# With 10 parameters, 100 samples each (nsamp=100), and 2 strategies, we expect 2000 rows
+# Note: run_owsa_det() returns rows for BOTH strategies (Folfox and Bevacizumab)
+# Even though ICER is the same ratio for both, dampack stores it per-strategy
 # This is a data quality check to ensure our filtering worked correctly
 # Health economic value: Ensuring data integrity before visualization
 # Modeling value: Catching any potential errors in the filtering process
 print(paste("Number of rows in DSAICER_top10:", nrow(DSAICER_top10)))
-print(paste("Expected rows: 10 parameters × 100 samples = 1000"))
+print(paste("Expected rows: 10 parameters × 100 samples × 2 strategies = 2000"))
 
 # If the numbers don't match, something went wrong in our filtering
 # This could indicate:
