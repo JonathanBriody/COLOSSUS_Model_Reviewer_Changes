@@ -7206,6 +7206,7 @@ DSAICER_top10 <- DSAICER %>%
 # With 10 parameters, 100 samples each (nsamp=100), and 2 strategies, we expect 2000 rows
 # Note: run_owsa_det() returns rows for BOTH strategies (Folfox and Bevacizumab)
 # Even though ICER is the same ratio for both, dampack stores it per-strategy
+# The run_owsa_det() function from dampack returns data for both strategies (Folfox and Bevacizumab), even though the ICER value is the same for both (since ICER is a ratio comparing the two).
 # This is a data quality check to ensure our filtering worked correctly
 # Health economic value: Ensuring data integrity before visualization
 # Modeling value: Catching any potential errors in the filtering process
@@ -7243,9 +7244,9 @@ print(paste("Expected rows: 10 parameters × 100 samples × 2 strategies = 2000"
 #
 # FIXED RANGE APPROACH:
 # -----------------------------------------------------------------------------
-# We set axis limits to a fixed €200k-€400k range for all tornado plots:
+# We set axis limits to a fixed €100k-€400k range for all tornado plots:
 #
-# 1. Lower bound: €200,000 per QALY
+# 1. Lower bound: €100,000 per QALY
 # 2. Upper bound: €400,000 per QALY
 # 3. Range spans all country WTP thresholds (Ireland: €45k, Germany: €78.9k, Spain: €30k)
 # 4. Focuses on clinically and policy-relevant ICER values
@@ -7262,7 +7263,7 @@ print(paste("Expected rows: 10 parameters × 100 samples × 2 strategies = 2000"
 # calculating data-driven limits.
 
 # Set fixed axis limits for consistent ICER range visualization
-# We're constraining the visualization to show ICERs within the €200k-€400k range
+# We're constraining the visualization to show ICERs within the €100k-€400k range
 # This provides a standardized comparison scale across all tornado plots
 # Health economic interpretation: We're establishing a consistent scale that:
 # 1. Spans well beyond the WTP thresholds for all three countries analyzed:
@@ -7283,7 +7284,7 @@ ylim_top10 <- c(100000, 400000)
 print(paste("Fixed ICER axis limits:", ylim_top10[1], "to", ylim_top10[2]))
 
 # Expected output:
-# "Fixed ICER axis limits: 200000 to 400000"
+# "Fixed ICER axis limits: 100000 to 400000"
 
 # ============================================================================
 # STEP 5: CREATE TORNADO PLOT FOR TOP 10 PARAMETERS
