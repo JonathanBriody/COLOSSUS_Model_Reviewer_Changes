@@ -1,0 +1,2 @@
+"Country","WTP_Threshold","Incremental_Cost_Mean","Incremental_Cost_Lower_CrI","Incremental_Cost_Upper_CrI","Incremental_QALY_Mean","Incremental_QALY_Lower_CrI","Incremental_QALY_Upper_CrI","Incremental_NMB_Mean","Incremental_NMB_Lower_CrI","Incremental_NMB_Upper_CrI"
+"Germany",78871,41698.7352464673,26479.9423387431,58434.94886422,0.172889002954998,0.0669259957370945,0.291819666901738,-28062.8066944037,-38684.9327495782,-19284.5804946276

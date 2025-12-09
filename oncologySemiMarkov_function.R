@@ -2,7 +2,41 @@
 
 # This "function" is basically just repeating the code from the Markov_3state.R script again.
 
-oncologySemiMarkov <- function(l_params_all, n_wtp = n_wtp) {
+# ============================================================================
+# FUNCTION SIGNATURE WITH PARAMETRIC DISTRIBUTION CHOICE
+# ============================================================================
+#
+# FUNCTION PURPOSE:
+# This function evaluates a three-state semi-Markov cost-effectiveness model
+# for oncology, returning costs, QALYs, and ICERs for multiple strategies.
+#
+# PARAMETERS:
+# - l_params_all: List or data frame containing all model parameters
+#                 (costs, utilities, probabilities, hazard ratios, etc.)
+# - n_wtp: Willingness-to-pay threshold (€ per QALY)
+# - curve_choice: Parametric survival distribution to use (NEW parameter)
+#                 Valid values: "weibull" (default) or "gamma"
+#                 Controls which distribution is used for survival extrapolation
+#
+# DEFAULT VALUE FOR curve_choice:
+# We set curve_choice = "weibull" as the default to maintain backward compatibility.
+# This means if the function is called without specifying curve_choice,
+# it will automatically use Weibull (the base case), ensuring that existing
+# code continues to work without modification.
+#
+# HEALTH ECONOMIC RATIONALE FOR PARAMETRIC CHOICE:
+# The choice of parametric survival distribution is a key structural assumption
+# in health economic models that extrapolate beyond observed trial data.
+# Different distributions make different assumptions about:
+#   1. The shape of the hazard function over time
+#   2. Long-term survival probabilities (tail behavior)
+#   3. Expected survival time (area under the survival curve)
+#
+# By allowing curve_choice to be specified, this function enables scenario
+# analyses to test the robustness of cost-effectiveness conclusions to
+# distributional assumptions.
+#
+oncologySemiMarkov <- function(l_params_all, n_wtp = n_wtp, curve_choice = "weibull") {
   
   with(as.list(l_params_all), {
     
@@ -22,17 +56,142 @@ oncologySemiMarkov <- function(l_params_all, n_wtp = n_wtp) {
     
     # Having established that allows us to obtain the transition probabilities for the time we are interested in for our cycles from this longer period individual patient data, so where the individual patient data is in months and our cycles are in fortnight or half months, this allows us to obtain transition probabilities for these fortnights.
     
-    # 2) Obtaining the event-free (i.e. survival) probabilities for the cycle times for SoC
-    # S_FP_SoC - survival of progression free to progression, i.e. not going to progression, i.e. staying in progression free.
-    # Note that the coefficients [that we took from flexsurvreg earlier] need to be transformed to obtain the parameters that the base R function uses
-    S_FP_SoC <- pweibull(
-      q     = t, 
-      shape = exp(coef_weibull_shape_SoC), 
-      scale = exp(coef_weibull_scale_SoC), 
-      lower.tail = FALSE
-    )
-    
-    ###### IN THE FUNCTION WE ARE USING WEIBULL, IF IN THE CODE IN MARKOV_3STATE.RMD WE USE SOMETHING OTHER THAN WEIBULL THEN WE WILL HAVE TO UPDATE THIS ACCORDINGLY.
+    # ========================================================================
+    # 2) Obtaining the event-free (i.e. survival) probabilities for SoC
+    # ========================================================================
+    #
+    # PARAMETRIC SURVIVAL CALCULATION WITH DISTRIBUTION CHOICE:
+    # This section calculates the baseline survival curve for Standard of Care.
+    # The survival function S(t) = P(T > t) gives the probability of remaining
+    # progression-free beyond time t.
+    #
+    # DISTRIBUTION SELECTION:
+    # Based on curve_choice parameter, we use either Weibull or gamma distribution.
+    # Both are fitted to the same observed data, but make different assumptions
+    # about how the hazard (risk) changes over time.
+    #
+    # SURVIVAL FUNCTION PROPERTIES:
+    # - S(0) = 1 (everyone starts progression-free)
+    # - S(t) decreases over time (some patients progress)
+    # - S(∞) → 0 (eventually, all patients either progress or die)
+    #
+    # HEALTH ECONOMIC INTERPRETATION:
+    # The area under the survival curve gives expected time in progression-free state.
+    # This directly contributes to PFS-QALYs (quality-adjusted life-years in PFS).
+    # Different distributions can give different areas, affecting total QALYs.
+    #
+    # S_FP_SoC - survival function from PFS (F) to progression (P) under SoC
+    # "Survival of progression free to progression" = NOT progressing = staying in PFS
+    #
+    # IMPLEMENTATION NOTE:
+    # The coefficients from flexsurvreg are on the log scale and must be
+    # exponentiated before use in base R distribution functions.
+    # This is because flexsurv uses log-transformation for numerical stability
+    # during maximum likelihood estimation.
+    #
+    if (curve_choice == "weibull") {
+      # ======================================================================
+      # WEIBULL DISTRIBUTION FOR TTP (Time To Progression)
+      # ======================================================================
+      #
+      # WEIBULL SURVIVAL FUNCTION:
+      # S(t) = exp(-(t/λ)^α) where α = shape, λ = scale
+      # In R: S(t) = pweibull(t, shape, scale, lower.tail = FALSE)
+      #
+      # PARAMETER INTERPRETATION:
+      #   - shape (α): Controls hazard behavior over time
+      #       α > 1: increasing hazard (risk increases over time)
+      #       α = 1: constant hazard (exponential distribution)
+      #       α < 1: decreasing hazard (risk decreases over time)
+      #   - scale (λ): Controls the time scale (higher = longer survival)
+      #
+      # HAZARD FUNCTION:
+      # h(t) = (α/λ) * (t/λ)^(α-1)
+      # This is monotonic (either always increasing or always decreasing).
+      #
+      # CLINICAL INTERPRETATION FOR PROGRESSION:
+      # If shape > 1: Progression risk increases over time
+      #   (e.g., tumor growth accelerates, treatment loses effectiveness)
+      # If shape < 1: Progression risk decreases over time
+      #   (e.g., patients who remain stable early are more likely to stay stable)
+      #
+      # COEFFICIENT TRANSFORMATION:
+      # flexsurv returns log(shape) and log(scale), so we use exp() to get
+      # the actual parameter values for pweibull().
+      #
+      S_FP_SoC <- pweibull(
+        q     = t,                              # Time points (cycle times)
+        shape = exp(coef_weibull_shape_SoC),    # exp(log(shape)) = shape
+        scale = exp(coef_weibull_scale_SoC),    # exp(log(scale)) = scale
+        lower.tail = FALSE                      # P(T > t) not P(T ≤ t)
+      )
+
+    } else if (curve_choice == "gamma") {
+      # ======================================================================
+      # GAMMA DISTRIBUTION FOR TTP (Time To Progression)
+      # ======================================================================
+      #
+      # GAMMA SURVIVAL FUNCTION:
+      # S(t) = 1 - F(t) where F is the gamma CDF
+      # In R: S(t) = pgamma(t, shape, rate, lower.tail = FALSE)
+      #
+      # PARAMETER INTERPRETATION:
+      #   - shape (α): Controls hazard shape
+      #       α > 1: hazard increases initially, can plateau
+      #       α = 1: constant hazard (exponential distribution)
+      #       α < 1: hazard decreases (similar to Weibull with shape < 1)
+      #   - rate (β): Controls speed of events (higher = faster events)
+      #
+      # Note: gamma can also be parameterized with scale = 1/rate
+      # flexsurv uses shape and rate parameterization
+      #
+      # HAZARD FUNCTION:
+      # h(t) = (β^α * t^(α-1) * exp(-βt)) / (Γ(α, βt) / Γ(α))
+      # where Γ is the gamma function and Γ(α, βt) is upper incomplete gamma
+      #
+      # KEY DIFFERENCE FROM WEIBULL:
+      # Unlike Weibull (monotonic hazard), gamma can have non-monotonic hazard:
+      #   - Hazard can increase initially then level off
+      #   - Better for complex progression patterns
+      #
+      # CLINICAL INTERPRETATION FOR PROGRESSION:
+      # The gamma distribution can model scenarios where:
+      #   - Early period: progression risk rises as disease evolves
+      #   - Later period: risk stabilizes in patients who remain PFS
+      # This "increasing then plateau" pattern may be more realistic than
+      # Weibull's strictly monotonic hazard in some cancers.
+      #
+      # MEAN TIME TO PROGRESSION:
+      # E[T] = α/β = shape/rate
+      # This helps understand expected PFS duration.
+      #
+      # COEFFICIENT TRANSFORMATION:
+      # flexsurv returns log(shape) and log(rate), so we use exp() to get
+      # the actual parameter values for pgamma().
+      #
+      S_FP_SoC <- pgamma(
+        q     = t,                              # Time points (cycle times)
+        shape = exp(coef_gamma_shape_SoC),      # exp(log(shape)) = shape (α)
+        rate  = exp(coef_gamma_rate_SoC),       # exp(log(rate)) = rate (β)
+        lower.tail = FALSE                      # P(T > t) not P(T ≤ t)
+      )
+
+    } else {
+      # ======================================================================
+      # ERROR HANDLING FOR INVALID curve_choice
+      # ======================================================================
+      # If curve_choice is neither "weibull" nor "gamma", stop execution
+      # and provide a clear error message.
+      # This prevents silent failures and helps debugging.
+      stop("ERROR: Unknown curve_choice '", curve_choice, "'. ",
+           "Valid options are 'weibull' or 'gamma'.")
+    }
+
+    # VERIFICATION COMMENT:
+    # At this point, S_FP_SoC contains the survival probabilities at each
+    # cycle time, regardless of which distribution was used.
+    # The subsequent hazard ratio application works identically for both
+    # distributions.
     
     
     # head(cbind(t, S_FP_SoC))
@@ -309,18 +468,164 @@ oncologySemiMarkov <- function(l_params_all, n_wtp = n_wtp) {
     
     # Having established that allows us to obtain the transition probabilities for the time we are interested in for our cycles from this longer period individual patient data, so where the individual patient data is in months and our cycles are in fortnight or half months, this allows us to obtain transition probabilities for these fortnights.
     
-    # 2) Obtaining the event-free (i.e. survival) probabilities for the cycle times for SoC
-    # S_PD_SoC - survival of progression free to progression, i.e. not going to progression, i.e. staying in progression free.
-    # Note that the coefficients [that we took from flexsurvreg earlier] need to be transformed to obtain the parameters that the base R function uses
-    S_PD_SoC <- pweibull(
-      q     = t, 
-      shape = exp(coef_TTD_weibull_shape_SoC), 
-      scale = exp(coef_TTD_weibull_scale_SoC), 
-      lower.tail = FALSE
-    )
-    
-    
-    ###### IN THE FUNCTION WE ARE USING WEIBULL, IF IN THE CODE IN MARKOV_3STATE.RMD WE USE SOMETHING OTHER THAN WEIBULL THEN WE WILL HAVE TO UPDATE THIS ACCORDINGLY.
+    # ========================================================================
+    # 2) Obtaining the event-free (i.e. survival) probabilities for SoC
+    # ========================================================================
+    #
+    # PARAMETRIC SURVIVAL CALCULATION FOR TTD (Time To Death / Overall Survival)
+    # This section calculates the baseline survival curve for death (overall survival)
+    # under Standard of Care.
+    #
+    # SURVIVAL FUNCTION S_PD:
+    # S_PD(t) = P(T_death > t) = probability of not dying by time t
+    # This is NOT the same as progression! This is survival from death while in PFS.
+    #
+    # HEALTH ECONOMIC INTERPRETATION - TIME TO DEATH:
+    # Time to death (overall survival) is a critical endpoint because:
+    #   1. It determines total life-years gained by treatment
+    #   2. It affects lifetime treatment and disease management costs
+    #   3. It is often the primary efficacy endpoint in oncology trials
+    #   4. Long-term extrapolation heavily influences cost-effectiveness
+    #
+    # RELATIONSHIP TO PFS:
+    # In our model:
+    #   - Patients start in PFS (progression-free survival)
+    #   - From PFS, they can transition to:
+    #       (a) Progressed state (OS = post-progression survival)
+    #       (b) Death directly from PFS
+    #   - S_PD captures direct death from PFS (transition b)
+    #   - S_FP (calculated above) captures progression (transition a)
+    #
+    # DISTRIBUTION CHOICE IMPACT ON TTD:
+    # The choice between Weibull and gamma can have even more impact on
+    # time-to-death than on time-to-progression because:
+    #   - TTD involves longer time horizon (entire lifetime)
+    #   - More extrapolation beyond observed data
+    #   - Tail behavior (long-term survival) differs between distributions
+    #   - Small differences in hazard rates compound over long time periods
+    #
+    # S_PD_SoC - survival function from PFS (P) to Death (D) under SoC
+    # "Survival from PFS to death" = NOT dying = staying alive
+    #
+    if (curve_choice == "weibull") {
+      # ======================================================================
+      # WEIBULL DISTRIBUTION FOR TTD (Time To Death / Overall Survival)
+      # ======================================================================
+      #
+      # WEIBULL SURVIVAL FUNCTION FOR DEATH:
+      # S(t) = exp(-(t/λ)^α) where α = shape, λ = scale
+      # In R: S(t) = pweibull(t, shape, scale, lower.tail = FALSE)
+      #
+      # PARAMETER INTERPRETATION FOR MORTALITY:
+      #   - shape (α): Controls mortality hazard behavior
+      #       α > 1: mortality risk increases over time (typical in cancer)
+      #       α = 1: constant mortality risk (exponential, memoryless)
+      #       α < 1: mortality risk decreases over time (survivor effect)
+      #   - scale (λ): Controls the time scale of death
+      #       Higher scale = longer survival times
+      #
+      # CLINICAL INTERPRETATION FOR MORTALITY:
+      # In cancer:
+      #   - Often α > 1 (increasing mortality risk as disease progresses)
+      #   - But some long-term survivors may have α < 1 (selected population)
+      # The Weibull assumes monotonic hazard, which may not capture:
+      #   - Initial high risk period
+      #   - Followed by plateau in long-term survivors
+      #
+      # EXTRAPOLATION CONSIDERATIONS:
+      # For lifetime cost-effectiveness models, we extrapolate far beyond trial:
+      #   - Trial may have 2-5 years follow-up
+      #   - Model may project 30+ years
+      #   - Weibull's monotonic hazard may over- or under-estimate long-term survival
+      #
+      # COEFFICIENT TRANSFORMATION:
+      # flexsurv returns log(shape) and log(scale) for numerical stability
+      # We exponentiate to get parameters for pweibull()
+      #
+      S_PD_SoC <- pweibull(
+        q     = t,                                  # Time points (cycle times)
+        shape = exp(coef_TTD_weibull_shape_SoC),    # exp(log(shape)) = shape (α)
+        scale = exp(coef_TTD_weibull_scale_SoC),    # exp(log(scale)) = scale (λ)
+        lower.tail = FALSE                          # P(T > t) not P(T ≤ t)
+      )
+
+    } else if (curve_choice == "gamma") {
+      # ======================================================================
+      # GAMMA DISTRIBUTION FOR TTD (Time To Death / Overall Survival)
+      # ======================================================================
+      #
+      # GAMMA SURVIVAL FUNCTION FOR DEATH:
+      # S(t) = 1 - F(t) where F is the gamma CDF
+      # In R: S(t) = pgamma(t, shape, rate, lower.tail = FALSE)
+      #
+      # PARAMETER INTERPRETATION FOR MORTALITY:
+      #   - shape (α): Controls the shape of the mortality hazard
+      #       α > 1: hazard increases initially, may plateau
+      #       α = 1: constant hazard (exponential)
+      #       α < 1: decreasing hazard
+      #   - rate (β): Controls the speed of mortality events
+      #       Higher rate = faster deaths = shorter survival
+      #
+      # HAZARD FUNCTION FOR GAMMA:
+      # h(t) = (β^α * t^(α-1) * exp(-βt)) / (Γ(α, βt) / Γ(α))
+      # Unlike Weibull, this can be non-monotonic:
+      #   - Can increase early (as cancer progresses)
+      #   - Then plateau (in long-term survivors with controlled disease)
+      #
+      # CLINICAL INTERPRETATION FOR MORTALITY:
+      # The gamma can model more realistic mortality patterns in cancer:
+      #   - Years 0-2: High mortality as aggressive disease manifests
+      #   - Years 3-5: Mortality rate stabilizes
+      #   - Years 5+: Lower, relatively stable mortality (cure fraction effect)
+      #
+      # This "increase then plateau" is often seen in cancer survival data
+      # and may be more plausible than Weibull's strictly monotonic hazard.
+      #
+      # EXTRAPOLATION ADVANTAGES:
+      # For long-term extrapolation, gamma may provide:
+      #   - More realistic long-term survival probabilities
+      #   - Better fit to observed "cure fraction" patterns
+      #   - Less extreme tail behavior than Weibull in some cases
+      #
+      # MEAN SURVIVAL TIME:
+      # E[T] = α/β = shape/rate
+      # This gives expected life-years, directly impacting QALYs gained.
+      #
+      # COEFFICIENT TRANSFORMATION:
+      # flexsurv returns log(shape) and log(rate)
+      # We exponentiate to get parameters for pgamma()
+      #
+      S_PD_SoC <- pgamma(
+        q     = t,                                  # Time points (cycle times)
+        shape = exp(coef_TTD_gamma_shape_SoC),      # exp(log(shape)) = shape (α)
+        rate  = exp(coef_TTD_gamma_rate_SoC),       # exp(log(rate)) = rate (β)
+        lower.tail = FALSE                          # P(T > t) not P(T ≤ t)
+      )
+
+    } else {
+      # ======================================================================
+      # ERROR HANDLING FOR INVALID curve_choice
+      # ======================================================================
+      # This should never be reached (already checked in TTP section),
+      # but we include it for defensive programming and clarity.
+      stop("ERROR: Unknown curve_choice '", curve_choice, "'. ",
+           "Valid options are 'weibull' or 'gamma'.")
+    }
+
+    # VERIFICATION COMMENT:
+    # S_PD_SoC now contains the overall survival probabilities at each cycle time.
+    # Like S_FP_SoC, the subsequent hazard ratio application is independent of
+    # which distribution was used to calculate this baseline survival curve.
+    #
+    # CONSISTENCY ACROSS DISTRIBUTIONS:
+    # Both Weibull and gamma produce survival probabilities with the same properties:
+    #   - S(0) = 1 (everyone alive at start)
+    #   - S(t) decreasing (monotonic)
+    #   - S(∞) → 0 (eventual death)
+    # The difference is in the *shape* of the decrease, which affects:
+    #   - Expected survival time (area under curve)
+    #   - Long-term survival probabilities
+    #   - Total life-years and QALYs
     
     
     # head(cbind(t, S_PD_SoC))
@@ -843,10 +1148,11 @@ oncologySemiMarkov <- function(l_params_all, n_wtp = n_wtp) {
     # u_F_Exp<-u_F-p_FA1_EXPR*u_AE1 -p_FA2_EXPR*u_AE2 -p_FA3_EXPR*u_AE3
     
     c_F_SoC       <- administration_cost + c_PFS_Folfox  # cost of one cycle in PFS state under standard of care
-    c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment 
+    c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment
      c_P       <- c_OS_Folfiri  + administration_cost# cost of one cycle in progression state (I assume in OS everyone gets the same treatment so it costs everyone the same to be treated).
+    c_D       <- 0     # cost of one cycle in dead state
 
-    
+
     c_F_SoC<-c_F_SoC +p_FA1_STD*c_AE1 +p_FA2_STD*c_AE2 +p_FA3_STD*c_AE3
     c_F_Exp<-c_F_Exp +p_FA1_EXPR*c_AE1 +p_FA2_EXPR*c_AE2 +p_FA3_EXPR*c_AE3
     
