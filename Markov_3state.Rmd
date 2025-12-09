@@ -7256,7 +7256,7 @@ print(paste("Expected rows: 10 parameters × 100 samples = 1000"))
 #
 # MODELING APPROACH:
 # -----------------------------------------------------------------------------
-# We set ylim_top10 to a fixed vector c(200000, 400000) rather than
+# We set ylim_top10 to a fixed vector c(100000, 400000) rather than
 # calculating data-driven limits.
 
 # Set fixed axis limits for consistent ICER range visualization
@@ -7272,7 +7272,7 @@ print(paste("Expected rows: 10 parameters × 100 samples = 1000"))
 # Modeling interpretation: Setting explicit ylim bounds for owsa_tornado
 # Note: "ylim" is the parameter name in owsa_tornado, but due to horizontal
 # orientation, this actually controls the ICER axis (which appears horizontal/x)
-ylim_top10 <- c(200000, 400000)
+ylim_top10 <- c(100000, 400000)
 
 # Display the fixed limits being used
 # This transparency is important for reproducibility and validation
