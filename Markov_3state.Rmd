@@ -932,8 +932,8 @@ get_country_params <- function(country) {
 
 # Uncomment ONE country (leave the others commented):
 # source("params_Ireland.R")
- source("params_Germany.R")
-# source("params_Spain.R")
+# source("params_Germany.R")
+ source("params_Spain.R")
 
 # Print confirmation
 cat("\n")
