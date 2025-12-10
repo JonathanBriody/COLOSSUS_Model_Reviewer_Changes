@@ -932,8 +932,8 @@ get_country_params <- function(country) {
 
 # Uncomment ONE country (leave the others commented):
 # source("params_Ireland.R")
-# source("params_Germany.R")
- source("params_Spain.R")
+ source("params_Germany.R")
+# source("params_Spain.R")
 
 # Print confirmation
 cat("\n")
@@ -6486,7 +6486,7 @@ DSAICER
 tornado_plot <- owsa_tornado(
   owsa = DSAICER,      # OWSA results containing all parameter variations
   txtsize = 11,         # Text size for parameter labels
-  ylim = c(100000, 400000)  # ICER range to display (€100k to €400k)
+  ylim = c(100000, 350000)  # ICER range to display (€100k to €400k)
 )
 
 # NOTE: Alternative approach (commented out below)
@@ -7275,7 +7275,7 @@ print(paste("Expected rows: 10 parameters × 100 samples × 2 strategies = 2000"
 # Modeling interpretation: Setting explicit ylim bounds for owsa_tornado
 # Note: "ylim" is the parameter name in owsa_tornado, but due to horizontal
 # orientation, this actually controls the ICER axis (which appears horizontal/x)
-ylim_top10 <- c(100000, 400000)
+ylim_top10 <- c(100000, 350000)
 
 # Display the fixed limits being used
 # This transparency is important for reproducibility and validation
