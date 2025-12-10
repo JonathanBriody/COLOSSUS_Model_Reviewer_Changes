@@ -5606,439 +5606,6 @@ cat("\n")
 
 ```
 
-```{r}
-# ============================================================================
-# PSA-BASED GAMMA DISTRIBUTION SCENARIO ANALYSIS - COUNTRY-SPECIFIC
-# ============================================================================
-#
-# This analysis runs for whichever country is active (uncommented) in the
-# country parameter blocks. Results will be labeled with the active country name.
-#
-# **CRITICAL METHODOLOGICAL NOTE - PSA-BASED COMPARISON:**
-# This section implements a PROBABILISTIC sensitivity analysis comparing
-# Weibull and gamma distributions. Both scenarios are evaluated using the
-# SAME PSA framework (n_runs simulations with parameter uncertainty).
-#
-# This ensures:
-#   1. The comparison reflects BOTH parameter AND structural uncertainty
-#   2. Results are reported as PSA means (not single deterministic values)
-#   3. We can quantify uncertainty via 95% credible intervals
-#   4. The comparison is methodologically consistent with the main PSA results
-#   5. Alignment with reviewer request to treat PSA as the "base case"
-#
-# SCENARIO ANALYSIS RATIONALE:
-# This section implements a scenario analysis where we test the impact of
-# using the gamma distribution instead of Weibull for survival extrapolation.
-# This addresses structural uncertainty in our cost-effectiveness model.
-#
-# HEALTH ECONOMIC IMPORTANCE:
-# The choice of parametric survival distribution can substantially affect:
-#   1. Long-term survival extrapolation (beyond observed trial data)
-#   2. Total life-years (QALYs) gained by the intervention
-#   3. Lifetime treatment costs
-#   4. The resulting cost-effectiveness ratio (ICER)
-#
-# If the ICER is highly sensitive to distributional choice, this indicates
-# structural uncertainty that may affect decision-making. HTA agencies often
-# request scenario analyses exploring alternative distributions.
-#
-# PSA-BASED IMPLEMENTATION APPROACH:
-# We will:
-#   1. Run FULL PSA with curve_choice = "weibull" (n_runs simulations)
-#   2. Calculate PSA means and 95% CrIs for Weibull scenario
-#   3. Run FULL PSA with curve_choice = "gamma" (n_runs simulations)
-#   4. Calculate PSA means and 95% CrIs for Gamma scenario
-#   5. Compare PSA-based results (means and CrIs) between distributions
-#   6. Interpret the sensitivity of our conclusions to distributional choice
-#
-# **WHY PSA-BASED INSTEAD OF DETERMINISTIC?**
-# - Aligns with reviewer feedback to treat PSA as effective base case
-# - Provides credible intervals around the distributional comparison
-# - Ensures internal consistency: main results are PSA-based, so scenario
-#   analysis should be PSA-based too
-# - More transparent about combined parameter + structural uncertainty
-#
-# NOTE: This analysis will run for whichever country is active (uncommented)
-# in the country parameter blocks at the start of the file. The output filename
-# will automatically include the active country name.
-
-# ============================================================================
-# STEP 1: RUN FULL PSA WITH WEIBULL DISTRIBUTION
-# ============================================================================
-#
-# **PSA APPROACH:**
-# We run the model n_runs times (e.g., 10,000 simulations), each time sampling
-# parameter values from their uncertainty distributions. This gives us a
-# distribution of costs and QALYs under Weibull, not just a single point estimate.
-#
-# df_PA_input already contains Weibull parameters sampled for all n_runs iterations
-#
-cat("Running PSA for WEIBULL distribution (", country_name, ")...\n", sep = "")
-cat("Number of simulations:", n_runs, "\n\n")
-
-# Create data frames to store PSA results for Weibull scenario
-# These will hold costs and QALYs for each PSA simulation
-df_c_weibull <- df_e_weibull <- data.frame(
-  SoC = rep(NA, n_runs),  # Standard of Care
-  Exp = rep(NA, n_runs)   # Experimental treatment
-)
-
-# PSA LOOP FOR WEIBULL:
-# For each PSA iteration, run the model with curve_choice = "weibull"
-# Each iteration uses a different row of df_PA_input (different parameter samples)
-for(i_run in 1:n_runs){
-  # Run model with Weibull distribution for this PSA iteration
-  # curve_choice = "weibull" tells the function to use pweibull() for survival
-  l_out_temp <- oncologySemiMarkov(
-    l_params_all = df_PA_input[i_run, ],  # Parameter values for this iteration
-    n_wtp        = n_wtp,                  # Willingness-to-pay threshold
-    curve_choice = "weibull"               # Use Weibull distribution
-  )
-
-  # Store costs and QALYs for this iteration
-  df_c_weibull[i_run, ] <- l_out_temp$Cost    # Costs for SoC and Exp
-  df_e_weibull[i_run, ] <- l_out_temp$Effect  # QALYs for SoC and Exp
-
-  # Display progress every 10% of simulations
-  if(i_run %% (n_runs/10) == 0) {
-    cat('\r', paste(round(i_run/n_runs * 100, 0), "% done (Weibull PSA)", sep = " "))
-  }
-}
-cat("\n")
-
-# CALCULATE PSA SUMMARY STATISTICS FOR WEIBULL:
-# For each strategy, calculate mean and 95% credible intervals
-#
-# Mean costs and QALYs (expected values across all PSA simulations)
-weibull_cost_soc_mean <- mean(df_c_weibull$SoC)
-weibull_cost_exp_mean <- mean(df_c_weibull$Exp)
-weibull_qaly_soc_mean <- mean(df_e_weibull$SoC)
-weibull_qaly_exp_mean <- mean(df_e_weibull$Exp)
-
-# Calculate incremental outcomes (mean of differences = difference of means)
-weibull_inc_cost_psa <- weibull_cost_exp_mean - weibull_cost_soc_mean
-weibull_inc_qaly_psa <- weibull_qaly_exp_mean - weibull_qaly_soc_mean
-
-# Calculate ICER from PSA means (not mean of ICERs, which would be misleading)
-weibull_icer_psa <- weibull_inc_cost_psa / weibull_inc_qaly_psa
-
-# Calculate Net Monetary Benefit distribution for Weibull
-weibull_incremental_costs <- df_c_weibull$Exp - df_c_weibull$SoC
-weibull_incremental_qalys <- df_e_weibull$Exp - df_e_weibull$SoC
-weibull_incremental_nmb <- (weibull_incremental_qalys * n_wtp) - weibull_incremental_costs
-
-# Calculate 95% credible intervals for incremental outcomes
-weibull_inc_cost_lower <- quantile(weibull_incremental_costs, probs = 0.025)
-weibull_inc_cost_upper <- quantile(weibull_incremental_costs, probs = 0.975)
-weibull_inc_qaly_lower <- quantile(weibull_incremental_qalys, probs = 0.025)
-weibull_inc_qaly_upper <- quantile(weibull_incremental_qalys, probs = 0.975)
-weibull_inc_nmb_mean <- mean(weibull_incremental_nmb)
-weibull_inc_nmb_lower <- quantile(weibull_incremental_nmb, probs = 0.025)
-weibull_inc_nmb_upper <- quantile(weibull_incremental_nmb, probs = 0.975)
-
-# Display Weibull PSA results
-cat("\n=======================================================\n")
-cat("WEIBULL PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
-cat("=======================================================\n")
-cat("Number of simulations:", n_runs, "\n\n")
-cat("Mean Costs:\n")
-cat("  SoC: €", round(weibull_cost_soc_mean, 2), "\n")
-cat("  Exp: €", round(weibull_cost_exp_mean, 2), "\n\n")
-cat("Mean QALYs:\n")
-cat("  SoC:", round(weibull_qaly_soc_mean, 4), "\n")
-cat("  Exp:", round(weibull_qaly_exp_mean, 4), "\n\n")
-cat("Incremental Cost (Mean): €", round(weibull_inc_cost_psa, 2),
-    " [95% CrI: €", round(weibull_inc_cost_lower, 2), " to €", round(weibull_inc_cost_upper, 2), "]\n")
-cat("Incremental QALYs (Mean):", round(weibull_inc_qaly_psa, 4),
-    " [95% CrI:", round(weibull_inc_qaly_lower, 4), "to", round(weibull_inc_qaly_upper, 4), "]\n")
-cat("ICER (from PSA means): €", round(weibull_icer_psa, 2), " per QALY\n")
-cat("Incremental NMB (Mean): €", round(weibull_inc_nmb_mean, 2),
-    " [95% CrI: €", round(weibull_inc_nmb_lower, 2), " to €", round(weibull_inc_nmb_upper, 2), "]\n")
-cat("=======================================================\n\n")
-
-
-# ============================================================================
-# STEP 2: RUN FULL PSA WITH GAMMA DISTRIBUTION
-# ============================================================================
-#
-# **PSA APPROACH:**
-# Now we run the SAME PSA (same n_runs, same parameter samples from df_PA_input),
-# but with curve_choice = "gamma" instead of "weibull".
-#
-# This ensures the comparison isolates STRUCTURAL uncertainty (Weibull vs Gamma)
-# while keeping PARAMETER uncertainty constant across both scenarios.
-#
-cat("Running PSA for GAMMA distribution (", country_name, ")...\n", sep = "")
-cat("Number of simulations:", n_runs, "\n\n")
-
-# Create data frames to store PSA results for Gamma scenario
-df_c_gamma <- df_e_gamma <- data.frame(
-  SoC = rep(NA, n_runs),  # Standard of Care
-  Exp = rep(NA, n_runs)   # Experimental treatment
-)
-
-# PSA LOOP FOR GAMMA:
-# For each PSA iteration, run the model with curve_choice = "gamma"
-# Use the SAME parameter samples (same row of df_PA_input) as Weibull
-# This ensures fair comparison (only distribution changes, not parameters)
-for(i_run in 1:n_runs){
-  # Run model with Gamma distribution for this PSA iteration
-  # curve_choice = "gamma" tells the function to use pgamma() for survival
-  l_out_temp <- oncologySemiMarkov(
-    l_params_all = df_PA_input[i_run, ],  # Same parameters as Weibull iteration
-    n_wtp        = n_wtp,                  # Same WTP threshold
-    curve_choice = "gamma"                 # Use Gamma distribution
-  )
-
-  # Store costs and QALYs for this iteration
-  df_c_gamma[i_run, ] <- l_out_temp$Cost    # Costs for SoC and Exp
-  df_e_gamma[i_run, ] <- l_out_temp$Effect  # QALYs for SoC and Exp
-
-  # Display progress every 10% of simulations
-  if(i_run %% (n_runs/10) == 0) {
-    cat('\r', paste(round(i_run/n_runs * 100, 0), "% done (Gamma PSA)", sep = " "))
-  }
-}
-cat("\n")
-
-# CALCULATE PSA SUMMARY STATISTICS FOR GAMMA:
-#
-# Mean costs and QALYs (expected values across all PSA simulations)
-gamma_cost_soc_mean <- mean(df_c_gamma$SoC)
-gamma_cost_exp_mean <- mean(df_c_gamma$Exp)
-gamma_qaly_soc_mean <- mean(df_e_gamma$SoC)
-gamma_qaly_exp_mean <- mean(df_e_gamma$Exp)
-
-# Calculate incremental outcomes
-gamma_inc_cost_psa <- gamma_cost_exp_mean - gamma_cost_soc_mean
-gamma_inc_qaly_psa <- gamma_qaly_exp_mean - gamma_qaly_soc_mean
-
-# Calculate ICER from PSA means
-gamma_icer_psa <- gamma_inc_cost_psa / gamma_inc_qaly_psa
-
-# Calculate Net Monetary Benefit distribution for Gamma
-gamma_incremental_costs <- df_c_gamma$Exp - df_c_gamma$SoC
-gamma_incremental_qalys <- df_e_gamma$Exp - df_e_gamma$SoC
-gamma_incremental_nmb <- (gamma_incremental_qalys * n_wtp) - gamma_incremental_costs
-
-# Calculate 95% credible intervals for incremental outcomes
-gamma_inc_cost_lower <- quantile(gamma_incremental_costs, probs = 0.025)
-gamma_inc_cost_upper <- quantile(gamma_incremental_costs, probs = 0.975)
-gamma_inc_qaly_lower <- quantile(gamma_incremental_qalys, probs = 0.025)
-gamma_inc_qaly_upper <- quantile(gamma_incremental_qalys, probs = 0.975)
-gamma_inc_nmb_mean <- mean(gamma_incremental_nmb)
-gamma_inc_nmb_lower <- quantile(gamma_incremental_nmb, probs = 0.025)
-gamma_inc_nmb_upper <- quantile(gamma_incremental_nmb, probs = 0.975)
-
-# Display Gamma PSA results
-cat("\n=======================================================\n")
-cat("GAMMA PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
-cat("=======================================================\n")
-cat("Number of simulations:", n_runs, "\n\n")
-cat("Mean Costs:\n")
-cat("  SoC: €", round(gamma_cost_soc_mean, 2), "\n")
-cat("  Exp: €", round(gamma_cost_exp_mean, 2), "\n\n")
-cat("Mean QALYs:\n")
-cat("  SoC:", round(gamma_qaly_soc_mean, 4), "\n")
-cat("  Exp:", round(gamma_qaly_exp_mean, 4), "\n\n")
-cat("Incremental Cost (Mean): €", round(gamma_inc_cost_psa, 2),
-    " [95% CrI: €", round(gamma_inc_cost_lower, 2), " to €", round(gamma_inc_cost_upper, 2), "]\n")
-cat("Incremental QALYs (Mean):", round(gamma_inc_qaly_psa, 4),
-    " [95% CrI:", round(gamma_inc_qaly_lower, 4), "to", round(gamma_inc_qaly_upper, 4), "]\n")
-cat("ICER (from PSA means): €", round(gamma_icer_psa, 2), " per QALY\n")
-cat("Incremental NMB (Mean): €", round(gamma_inc_nmb_mean, 2),
-    " [95% CrI: €", round(gamma_inc_nmb_lower, 2), " to €", round(gamma_inc_nmb_upper, 2), "]\n")
-cat("=======================================================\n\n")
-
-
-# ============================================================================
-# STEP 3: CREATE PSA-BASED COMPARISON TABLE
-# ============================================================================
-#
-# **PSA-BASED COMPARISON TABLE:**
-# This table reports PSA means and 95% credible intervals for both distributions.
-# All values are derived from the PSA results (not deterministic single-run values).
-#
-# This table is suitable for inclusion in the manuscript as it shows:
-#   1. Mean costs and QALYs for each strategy under each distribution
-#   2. Incremental costs and QALYs (with 95% CrIs)
-#   3. ICERs calculated from PSA means
-#   4. Incremental NMB (with 95% CrIs)
-#
-cat("Creating PSA-based Weibull vs Gamma comparison table...\n")
-
-# Create comprehensive comparison table with PSA-based results
-# This table has one row per distribution, showing all summary statistics
-psa_comparison_table <- data.frame(
-  Distribution = c("Weibull", "Gamma"),
-
-  # Mean costs for each strategy
-  SoC_Cost_Mean = c(weibull_cost_soc_mean, gamma_cost_soc_mean),
-  Exp_Cost_Mean = c(weibull_cost_exp_mean, gamma_cost_exp_mean),
-
-  # Mean QALYs for each strategy
-  SoC_QALY_Mean = c(weibull_qaly_soc_mean, gamma_qaly_soc_mean),
-  Exp_QALY_Mean = c(weibull_qaly_exp_mean, gamma_qaly_exp_mean),
-
-  # Incremental outcomes (means)
-  Inc_Cost_Mean = c(weibull_inc_cost_psa, gamma_inc_cost_psa),
-  Inc_QALY_Mean = c(weibull_inc_qaly_psa, gamma_inc_qaly_psa),
-
-  # ICER from PSA means
-  ICER_PSA = c(weibull_icer_psa, gamma_icer_psa),
-
-  # Incremental NMB (mean)
-  Inc_NMB_Mean = c(weibull_inc_nmb_mean, gamma_inc_nmb_mean),
-
-  # 95% Credible intervals for incremental cost
-  Inc_Cost_Lower_CrI = c(weibull_inc_cost_lower, gamma_inc_cost_lower),
-  Inc_Cost_Upper_CrI = c(weibull_inc_cost_upper, gamma_inc_cost_upper),
-
-  # 95% Credible intervals for incremental QALYs
-  Inc_QALY_Lower_CrI = c(weibull_inc_qaly_lower, gamma_inc_qaly_lower),
-  Inc_QALY_Upper_CrI = c(weibull_inc_qaly_upper, gamma_inc_qaly_upper),
-
-  # 95% Credible intervals for incremental NMB
-  Inc_NMB_Lower_CrI = c(weibull_inc_nmb_lower, gamma_inc_nmb_lower),
-  Inc_NMB_Upper_CrI = c(weibull_inc_nmb_upper, gamma_inc_nmb_upper),
-
-  stringsAsFactors = FALSE
-)
-
-# Display the PSA-based comparison table
-cat("\n=======================================================\n")
-cat("WEIBULL VS. GAMMA COMPARISON TABLE (PSA-BASED)\n")
-cat("=======================================================\n")
-print(psa_comparison_table, row.names = FALSE)
-cat("=======================================================\n\n")
-
-# Save PSA-based comparison table to CSV for use in paper
-# Filename dynamically includes country name from active country block
-comparison_filename <- paste0("Weibull_vs_Gamma_", country_name, "_PSA.csv")
-write.csv(
-  psa_comparison_table,
-  file = file.path("output", comparison_filename),
-  row.names = FALSE
-)
-
-cat("PSA-based comparison table saved to: output/", comparison_filename, "\n\n", sep = "")
-
-
-# ============================================================================
-# STEP 4: INTERPRET PSA-BASED COMPARISON
-# ============================================================================
-#
-# **INTERPRETATION OF PSA-BASED RESULTS:**
-# Compare ICERs calculated from PSA means to assess structural uncertainty
-#
-icer_difference_psa <- gamma_icer_psa - weibull_icer_psa
-icer_percent_change_psa <- (gamma_icer_psa - weibull_icer_psa) / weibull_icer_psa * 100
-
-cat("=======================================================\n")
-cat("INTERPRETATION OF PSA-BASED RESULTS:\n")
-cat("=======================================================\n")
-cat("ICER under Weibull (PSA): €", round(weibull_icer_psa, 2), " per QALY\n")
-cat("ICER under Gamma (PSA):   €", round(gamma_icer_psa, 2), " per QALY\n")
-cat("Absolute difference:      €", round(icer_difference_psa, 2), " per QALY\n")
-cat("Relative change:          ", round(icer_percent_change_psa, 2), "%\n\n")
-
-# Interpret the sensitivity based on the magnitude of change
-# HEALTH ECONOMIC INTERPRETATION:
-# - Small change (<10%): Results are robust to distributional choice
-# - Moderate change (10-25%): Some structural uncertainty, but conclusions likely stable
-# - Large change (>25%): Substantial structural uncertainty, may affect decision
-#
-# We also compare to the willingness-to-pay threshold for Ireland (€45,000/QALY)
-# to see if the cost-effectiveness conclusion changes
-wtp_ireland <- 45000
-
-# Check if cost-effectiveness conclusion changes (using PSA-based ICERs)
-weibull_cost_effective_psa <- weibull_icer_psa <= wtp_ireland
-gamma_cost_effective_psa <- gamma_icer_psa <= wtp_ireland
-
-if (weibull_cost_effective_psa == gamma_cost_effective_psa) {
-  cat("COST-EFFECTIVENESS CONCLUSION: CONSISTENT\n")
-  if (weibull_cost_effective_psa) {
-    cat("The intervention is cost-effective under BOTH distributions\n")
-    cat("(ICER < €", wtp_ireland, "/QALY in both scenarios)\n\n")
-  } else {
-    cat("The intervention is NOT cost-effective under EITHER distribution\n")
-    cat("(ICER > €", wtp_ireland, "/QALY in both scenarios)\n\n")
-  }
-} else {
-  cat("COST-EFFECTIVENESS CONCLUSION: **CHANGES WITH DISTRIBUTION**\n")
-  cat("WARNING: The cost-effectiveness conclusion is sensitive to\n")
-  cat("         distributional choice. This represents substantial\n")
-  cat("         structural uncertainty that should be considered\n")
-  cat("         in decision-making.\n\n")
-}
-
-# Provide interpretation guidance (using PSA-based percent change)
-if (abs(icer_percent_change_psa) < 10) {
-  cat("STRUCTURAL UNCERTAINTY: LOW\n")
-  cat("The ICER changes by less than 10%, indicating that results are\n")
-  cat("robust to the choice between Weibull and gamma distributions.\n")
-} else if (abs(icer_percent_change_psa) < 25) {
-  cat("STRUCTURAL UNCERTAINTY: MODERATE\n")
-  cat("The ICER changes by 10-25%, indicating some structural uncertainty.\n")
-  cat("The cost-effectiveness conclusion is likely stable, but the magnitude\n")
-  cat("of cost-effectiveness varies with distributional choice.\n")
-} else {
-  cat("STRUCTURAL UNCERTAINTY: HIGH\n")
-  cat("The ICER changes by more than 25%, indicating substantial structural\n")
-  cat("uncertainty. Consider additional scenario analyses and potentially\n")
-  cat("other survival distributions. The choice of distribution meaningfully\n")
-  cat("affects the cost-effectiveness conclusion.\n")
-}
-
-# NOTE ON FURTHER ANALYSIS:
-# If structural uncertainty is high, consider:
-#   1. Testing additional distributions (log-normal, log-logistic, etc.)
-#   2. Exploring alternative approaches (spline models, mixture models)
-#   3. Obtaining longer-term follow-up data to reduce extrapolation uncertainty
-#   4. Consulting clinical experts on plausibility of long-term extrapolations
-#   5. Reporting a range of ICERs across plausible distributions
-
-# ============================================================================
-# METHODOLOGICAL NOTE: PSA-BASED RESULTS ARE THE REPORTED BASE CASE
-# ============================================================================
-#
-# **CRITICAL CLARIFICATION FOR MANUSCRIPT:**
-#
-# All results reported in this analysis are PSA-BASED, not deterministic.
-# This includes:
-#   - The "base case" Weibull results: derived from PSA means, not single run
-#   - The gamma scenario results: derived from PSA means, not single run
-#   - All ICERs: calculated from PSA means (ΔCost_mean / ΔQALY_mean)
-#   - All 95% CrIs: derived from PSA distributions
-#
-# This approach:
-#   1. Aligns with reviewer feedback to treat PSA as the effective base case
-#   2. Ensures internal consistency (all reported values reflect uncertainty)
-#   3. Provides more transparent reporting of parameter uncertainty
-#   4. Makes Weibull vs Gamma comparison methodologically rigorous
-#
-# For the paper:
-#   - Table of base-case results → use PSA means from df_out_ce_PA
-#   - Weibull vs Gamma comparison → use psa_comparison_table (saved to CSV)
-#   - All reported ICERs → calculated from PSA means
-#   - All uncertainty bounds → 95% CrIs from PSA distributions
-#
-cat("\n=======================================================\n")
-cat("PSA-BASED GAMMA SCENARIO ANALYSIS COMPLETE\n")
-cat("=======================================================\n")
-cat("All results are PSA-based (means from", n_runs, "simulations)\n")
-cat("Comparison table saved to: output/", comparison_filename, "\n", sep = "")
-cat("=======================================================\n\n")
-
-```
-
-```{r}
-
-
-
-
-
 
 
 # Entering parameter values:
@@ -9867,6 +9434,433 @@ head(df_PA_input)
 # An additional note that I shared the file describing the manner in which I calculate the se's and distributions with Joshua Soboil and Qiushi Chen and they both supported that the strategy I took was reasonable. 
 
 # I'm going to reach out to Jack Williams to discuss his publication on the Crash Mild Model. This also calculateda PSA and described shapes and scales and mean values, so there may be additional information there that could be useful to me in the future: https://github.com/jackrdwilliams/CRASH-Mild-Model/blob/master/CRASH-Mild%20R%20Model.R
+
+```
+
+```{r}
+# ============================================================================
+# PSA-BASED GAMMA DISTRIBUTION SCENARIO ANALYSIS - COUNTRY-SPECIFIC
+# ============================================================================
+#
+# This analysis runs for whichever country is active (uncommented) in the
+# country parameter blocks. Results will be labeled with the active country name.
+#
+# **CRITICAL METHODOLOGICAL NOTE - PSA-BASED COMPARISON:**
+# This section implements a PROBABILISTIC sensitivity analysis comparing
+# Weibull and gamma distributions. Both scenarios are evaluated using the
+# SAME PSA framework (n_runs simulations with parameter uncertainty).
+#
+# This ensures:
+#   1. The comparison reflects BOTH parameter AND structural uncertainty
+#   2. Results are reported as PSA means (not single deterministic values)
+#   3. We can quantify uncertainty via 95% credible intervals
+#   4. The comparison is methodologically consistent with the main PSA results
+#   5. Alignment with reviewer request to treat PSA as the "base case"
+#
+# SCENARIO ANALYSIS RATIONALE:
+# This section implements a scenario analysis where we test the impact of
+# using the gamma distribution instead of Weibull for survival extrapolation.
+# This addresses structural uncertainty in our cost-effectiveness model.
+#
+# HEALTH ECONOMIC IMPORTANCE:
+# The choice of parametric survival distribution can substantially affect:
+#   1. Long-term survival extrapolation (beyond observed trial data)
+#   2. Total life-years (QALYs) gained by the intervention
+#   3. Lifetime treatment costs
+#   4. The resulting cost-effectiveness ratio (ICER)
+#
+# If the ICER is highly sensitive to distributional choice, this indicates
+# structural uncertainty that may affect decision-making. HTA agencies often
+# request scenario analyses exploring alternative distributions.
+#
+# PSA-BASED IMPLEMENTATION APPROACH:
+# We will:
+#   1. Run FULL PSA with curve_choice = "weibull" (n_runs simulations)
+#   2. Calculate PSA means and 95% CrIs for Weibull scenario
+#   3. Run FULL PSA with curve_choice = "gamma" (n_runs simulations)
+#   4. Calculate PSA means and 95% CrIs for Gamma scenario
+#   5. Compare PSA-based results (means and CrIs) between distributions
+#   6. Interpret the sensitivity of our conclusions to distributional choice
+#
+# **WHY PSA-BASED INSTEAD OF DETERMINISTIC?**
+# - Aligns with reviewer feedback to treat PSA as effective base case
+# - Provides credible intervals around the distributional comparison
+# - Ensures internal consistency: main results are PSA-based, so scenario
+#   analysis should be PSA-based too
+# - More transparent about combined parameter + structural uncertainty
+#
+# NOTE: This analysis will run for whichever country is active (uncommented)
+# in the country parameter blocks at the start of the file. The output filename
+# will automatically include the active country name.
+
+# ============================================================================
+# STEP 1: RUN FULL PSA WITH WEIBULL DISTRIBUTION
+# ============================================================================
+#
+# **PSA APPROACH:**
+# We run the model n_runs times (e.g., 10,000 simulations), each time sampling
+# parameter values from their uncertainty distributions. This gives us a
+# distribution of costs and QALYs under Weibull, not just a single point estimate.
+#
+# df_PA_input already contains Weibull parameters sampled for all n_runs iterations
+#
+cat("Running PSA for WEIBULL distribution (", country_name, ")...\n", sep = "")
+cat("Number of simulations:", n_runs, "\n\n")
+
+# Create data frames to store PSA results for Weibull scenario
+# These will hold costs and QALYs for each PSA simulation
+df_c_weibull <- df_e_weibull <- data.frame(
+  SoC = rep(NA, n_runs),  # Standard of Care
+  Exp = rep(NA, n_runs)   # Experimental treatment
+)
+
+# PSA LOOP FOR WEIBULL:
+# For each PSA iteration, run the model with curve_choice = "weibull"
+# Each iteration uses a different row of df_PA_input (different parameter samples)
+for(i_run in 1:n_runs){
+  # Run model with Weibull distribution for this PSA iteration
+  # curve_choice = "weibull" tells the function to use pweibull() for survival
+  l_out_temp <- oncologySemiMarkov(
+    l_params_all = df_PA_input[i_run, ],  # Parameter values for this iteration
+    n_wtp        = n_wtp,                  # Willingness-to-pay threshold
+    curve_choice = "weibull"               # Use Weibull distribution
+  )
+
+  # Store costs and QALYs for this iteration
+  df_c_weibull[i_run, ] <- l_out_temp$Cost    # Costs for SoC and Exp
+  df_e_weibull[i_run, ] <- l_out_temp$Effect  # QALYs for SoC and Exp
+
+  # Display progress every 10% of simulations
+  if(i_run %% (n_runs/10) == 0) {
+    cat('\r', paste(round(i_run/n_runs * 100, 0), "% done (Weibull PSA)", sep = " "))
+  }
+}
+cat("\n")
+
+# CALCULATE PSA SUMMARY STATISTICS FOR WEIBULL:
+# For each strategy, calculate mean and 95% credible intervals
+#
+# Mean costs and QALYs (expected values across all PSA simulations)
+weibull_cost_soc_mean <- mean(df_c_weibull$SoC)
+weibull_cost_exp_mean <- mean(df_c_weibull$Exp)
+weibull_qaly_soc_mean <- mean(df_e_weibull$SoC)
+weibull_qaly_exp_mean <- mean(df_e_weibull$Exp)
+
+# Calculate incremental outcomes (mean of differences = difference of means)
+weibull_inc_cost_psa <- weibull_cost_exp_mean - weibull_cost_soc_mean
+weibull_inc_qaly_psa <- weibull_qaly_exp_mean - weibull_qaly_soc_mean
+
+# Calculate ICER from PSA means (not mean of ICERs, which would be misleading)
+weibull_icer_psa <- weibull_inc_cost_psa / weibull_inc_qaly_psa
+
+# Calculate Net Monetary Benefit distribution for Weibull
+weibull_incremental_costs <- df_c_weibull$Exp - df_c_weibull$SoC
+weibull_incremental_qalys <- df_e_weibull$Exp - df_e_weibull$SoC
+weibull_incremental_nmb <- (weibull_incremental_qalys * n_wtp) - weibull_incremental_costs
+
+# Calculate 95% credible intervals for incremental outcomes
+weibull_inc_cost_lower <- quantile(weibull_incremental_costs, probs = 0.025)
+weibull_inc_cost_upper <- quantile(weibull_incremental_costs, probs = 0.975)
+weibull_inc_qaly_lower <- quantile(weibull_incremental_qalys, probs = 0.025)
+weibull_inc_qaly_upper <- quantile(weibull_incremental_qalys, probs = 0.975)
+weibull_inc_nmb_mean <- mean(weibull_incremental_nmb)
+weibull_inc_nmb_lower <- quantile(weibull_incremental_nmb, probs = 0.025)
+weibull_inc_nmb_upper <- quantile(weibull_incremental_nmb, probs = 0.975)
+
+# Display Weibull PSA results
+cat("\n=======================================================\n")
+cat("WEIBULL PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
+cat("=======================================================\n")
+cat("Number of simulations:", n_runs, "\n\n")
+cat("Mean Costs:\n")
+cat("  SoC: €", round(weibull_cost_soc_mean, 2), "\n")
+cat("  Exp: €", round(weibull_cost_exp_mean, 2), "\n\n")
+cat("Mean QALYs:\n")
+cat("  SoC:", round(weibull_qaly_soc_mean, 4), "\n")
+cat("  Exp:", round(weibull_qaly_exp_mean, 4), "\n\n")
+cat("Incremental Cost (Mean): €", round(weibull_inc_cost_psa, 2),
+    " [95% CrI: €", round(weibull_inc_cost_lower, 2), " to €", round(weibull_inc_cost_upper, 2), "]\n")
+cat("Incremental QALYs (Mean):", round(weibull_inc_qaly_psa, 4),
+    " [95% CrI:", round(weibull_inc_qaly_lower, 4), "to", round(weibull_inc_qaly_upper, 4), "]\n")
+cat("ICER (from PSA means): €", round(weibull_icer_psa, 2), " per QALY\n")
+cat("Incremental NMB (Mean): €", round(weibull_inc_nmb_mean, 2),
+    " [95% CrI: €", round(weibull_inc_nmb_lower, 2), " to €", round(weibull_inc_nmb_upper, 2), "]\n")
+cat("=======================================================\n\n")
+
+
+# ============================================================================
+# STEP 2: RUN FULL PSA WITH GAMMA DISTRIBUTION
+# ============================================================================
+#
+# **PSA APPROACH:**
+# Now we run the SAME PSA (same n_runs, same parameter samples from df_PA_input),
+# but with curve_choice = "gamma" instead of "weibull".
+#
+# This ensures the comparison isolates STRUCTURAL uncertainty (Weibull vs Gamma)
+# while keeping PARAMETER uncertainty constant across both scenarios.
+#
+cat("Running PSA for GAMMA distribution (", country_name, ")...\n", sep = "")
+cat("Number of simulations:", n_runs, "\n\n")
+
+# Create data frames to store PSA results for Gamma scenario
+df_c_gamma <- df_e_gamma <- data.frame(
+  SoC = rep(NA, n_runs),  # Standard of Care
+  Exp = rep(NA, n_runs)   # Experimental treatment
+)
+
+# PSA LOOP FOR GAMMA:
+# For each PSA iteration, run the model with curve_choice = "gamma"
+# Use the SAME parameter samples (same row of df_PA_input) as Weibull
+# This ensures fair comparison (only distribution changes, not parameters)
+for(i_run in 1:n_runs){
+  # Run model with Gamma distribution for this PSA iteration
+  # curve_choice = "gamma" tells the function to use pgamma() for survival
+  l_out_temp <- oncologySemiMarkov(
+    l_params_all = df_PA_input[i_run, ],  # Same parameters as Weibull iteration
+    n_wtp        = n_wtp,                  # Same WTP threshold
+    curve_choice = "gamma"                 # Use Gamma distribution
+  )
+
+  # Store costs and QALYs for this iteration
+  df_c_gamma[i_run, ] <- l_out_temp$Cost    # Costs for SoC and Exp
+  df_e_gamma[i_run, ] <- l_out_temp$Effect  # QALYs for SoC and Exp
+
+  # Display progress every 10% of simulations
+  if(i_run %% (n_runs/10) == 0) {
+    cat('\r', paste(round(i_run/n_runs * 100, 0), "% done (Gamma PSA)", sep = " "))
+  }
+}
+cat("\n")
+
+# CALCULATE PSA SUMMARY STATISTICS FOR GAMMA:
+#
+# Mean costs and QALYs (expected values across all PSA simulations)
+gamma_cost_soc_mean <- mean(df_c_gamma$SoC)
+gamma_cost_exp_mean <- mean(df_c_gamma$Exp)
+gamma_qaly_soc_mean <- mean(df_e_gamma$SoC)
+gamma_qaly_exp_mean <- mean(df_e_gamma$Exp)
+
+# Calculate incremental outcomes
+gamma_inc_cost_psa <- gamma_cost_exp_mean - gamma_cost_soc_mean
+gamma_inc_qaly_psa <- gamma_qaly_exp_mean - gamma_qaly_soc_mean
+
+# Calculate ICER from PSA means
+gamma_icer_psa <- gamma_inc_cost_psa / gamma_inc_qaly_psa
+
+# Calculate Net Monetary Benefit distribution for Gamma
+gamma_incremental_costs <- df_c_gamma$Exp - df_c_gamma$SoC
+gamma_incremental_qalys <- df_e_gamma$Exp - df_e_gamma$SoC
+gamma_incremental_nmb <- (gamma_incremental_qalys * n_wtp) - gamma_incremental_costs
+
+# Calculate 95% credible intervals for incremental outcomes
+gamma_inc_cost_lower <- quantile(gamma_incremental_costs, probs = 0.025)
+gamma_inc_cost_upper <- quantile(gamma_incremental_costs, probs = 0.975)
+gamma_inc_qaly_lower <- quantile(gamma_incremental_qalys, probs = 0.025)
+gamma_inc_qaly_upper <- quantile(gamma_incremental_qalys, probs = 0.975)
+gamma_inc_nmb_mean <- mean(gamma_incremental_nmb)
+gamma_inc_nmb_lower <- quantile(gamma_incremental_nmb, probs = 0.025)
+gamma_inc_nmb_upper <- quantile(gamma_incremental_nmb, probs = 0.975)
+
+# Display Gamma PSA results
+cat("\n=======================================================\n")
+cat("GAMMA PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
+cat("=======================================================\n")
+cat("Number of simulations:", n_runs, "\n\n")
+cat("Mean Costs:\n")
+cat("  SoC: €", round(gamma_cost_soc_mean, 2), "\n")
+cat("  Exp: €", round(gamma_cost_exp_mean, 2), "\n\n")
+cat("Mean QALYs:\n")
+cat("  SoC:", round(gamma_qaly_soc_mean, 4), "\n")
+cat("  Exp:", round(gamma_qaly_exp_mean, 4), "\n\n")
+cat("Incremental Cost (Mean): €", round(gamma_inc_cost_psa, 2),
+    " [95% CrI: €", round(gamma_inc_cost_lower, 2), " to €", round(gamma_inc_cost_upper, 2), "]\n")
+cat("Incremental QALYs (Mean):", round(gamma_inc_qaly_psa, 4),
+    " [95% CrI:", round(gamma_inc_qaly_lower, 4), "to", round(gamma_inc_qaly_upper, 4), "]\n")
+cat("ICER (from PSA means): €", round(gamma_icer_psa, 2), " per QALY\n")
+cat("Incremental NMB (Mean): €", round(gamma_inc_nmb_mean, 2),
+    " [95% CrI: €", round(gamma_inc_nmb_lower, 2), " to €", round(gamma_inc_nmb_upper, 2), "]\n")
+cat("=======================================================\n\n")
+
+
+# ============================================================================
+# STEP 3: CREATE PSA-BASED COMPARISON TABLE
+# ============================================================================
+#
+# **PSA-BASED COMPARISON TABLE:**
+# This table reports PSA means and 95% credible intervals for both distributions.
+# All values are derived from the PSA results (not deterministic single-run values).
+#
+# This table is suitable for inclusion in the manuscript as it shows:
+#   1. Mean costs and QALYs for each strategy under each distribution
+#   2. Incremental costs and QALYs (with 95% CrIs)
+#   3. ICERs calculated from PSA means
+#   4. Incremental NMB (with 95% CrIs)
+#
+cat("Creating PSA-based Weibull vs Gamma comparison table...\n")
+
+# Create comprehensive comparison table with PSA-based results
+# This table has one row per distribution, showing all summary statistics
+psa_comparison_table <- data.frame(
+  Distribution = c("Weibull", "Gamma"),
+
+  # Mean costs for each strategy
+  SoC_Cost_Mean = c(weibull_cost_soc_mean, gamma_cost_soc_mean),
+  Exp_Cost_Mean = c(weibull_cost_exp_mean, gamma_cost_exp_mean),
+
+  # Mean QALYs for each strategy
+  SoC_QALY_Mean = c(weibull_qaly_soc_mean, gamma_qaly_soc_mean),
+  Exp_QALY_Mean = c(weibull_qaly_exp_mean, gamma_qaly_exp_mean),
+
+  # Incremental outcomes (means)
+  Inc_Cost_Mean = c(weibull_inc_cost_psa, gamma_inc_cost_psa),
+  Inc_QALY_Mean = c(weibull_inc_qaly_psa, gamma_inc_qaly_psa),
+
+  # ICER from PSA means
+  ICER_PSA = c(weibull_icer_psa, gamma_icer_psa),
+
+  # Incremental NMB (mean)
+  Inc_NMB_Mean = c(weibull_inc_nmb_mean, gamma_inc_nmb_mean),
+
+  # 95% Credible intervals for incremental cost
+  Inc_Cost_Lower_CrI = c(weibull_inc_cost_lower, gamma_inc_cost_lower),
+  Inc_Cost_Upper_CrI = c(weibull_inc_cost_upper, gamma_inc_cost_upper),
+
+  # 95% Credible intervals for incremental QALYs
+  Inc_QALY_Lower_CrI = c(weibull_inc_qaly_lower, gamma_inc_qaly_lower),
+  Inc_QALY_Upper_CrI = c(weibull_inc_qaly_upper, gamma_inc_qaly_upper),
+
+  # 95% Credible intervals for incremental NMB
+  Inc_NMB_Lower_CrI = c(weibull_inc_nmb_lower, gamma_inc_nmb_lower),
+  Inc_NMB_Upper_CrI = c(weibull_inc_nmb_upper, gamma_inc_nmb_upper),
+
+  stringsAsFactors = FALSE
+)
+
+# Display the PSA-based comparison table
+cat("\n=======================================================\n")
+cat("WEIBULL VS. GAMMA COMPARISON TABLE (PSA-BASED)\n")
+cat("=======================================================\n")
+print(psa_comparison_table, row.names = FALSE)
+cat("=======================================================\n\n")
+
+# Save PSA-based comparison table to CSV for use in paper
+# Filename dynamically includes country name from active country block
+comparison_filename <- paste0("Weibull_vs_Gamma_", country_name, "_PSA.csv")
+write.csv(
+  psa_comparison_table,
+  file = file.path("output", comparison_filename),
+  row.names = FALSE
+)
+
+cat("PSA-based comparison table saved to: output/", comparison_filename, "\n\n", sep = "")
+
+
+# ============================================================================
+# STEP 4: INTERPRET PSA-BASED COMPARISON
+# ============================================================================
+#
+# **INTERPRETATION OF PSA-BASED RESULTS:**
+# Compare ICERs calculated from PSA means to assess structural uncertainty
+#
+icer_difference_psa <- gamma_icer_psa - weibull_icer_psa
+icer_percent_change_psa <- (gamma_icer_psa - weibull_icer_psa) / weibull_icer_psa * 100
+
+cat("=======================================================\n")
+cat("INTERPRETATION OF PSA-BASED RESULTS:\n")
+cat("=======================================================\n")
+cat("ICER under Weibull (PSA): €", round(weibull_icer_psa, 2), " per QALY\n")
+cat("ICER under Gamma (PSA):   €", round(gamma_icer_psa, 2), " per QALY\n")
+cat("Absolute difference:      €", round(icer_difference_psa, 2), " per QALY\n")
+cat("Relative change:          ", round(icer_percent_change_psa, 2), "%\n\n")
+
+# Interpret the sensitivity based on the magnitude of change
+# HEALTH ECONOMIC INTERPRETATION:
+# - Small change (<10%): Results are robust to distributional choice
+# - Moderate change (10-25%): Some structural uncertainty, but conclusions likely stable
+# - Large change (>25%): Substantial structural uncertainty, may affect decision
+#
+# We also compare to the willingness-to-pay threshold for Ireland (€45,000/QALY)
+# to see if the cost-effectiveness conclusion changes
+wtp_ireland <- 45000
+
+# Check if cost-effectiveness conclusion changes (using PSA-based ICERs)
+weibull_cost_effective_psa <- weibull_icer_psa <= wtp_ireland
+gamma_cost_effective_psa <- gamma_icer_psa <= wtp_ireland
+
+if (weibull_cost_effective_psa == gamma_cost_effective_psa) {
+  cat("COST-EFFECTIVENESS CONCLUSION: CONSISTENT\n")
+  if (weibull_cost_effective_psa) {
+    cat("The intervention is cost-effective under BOTH distributions\n")
+    cat("(ICER < €", wtp_ireland, "/QALY in both scenarios)\n\n")
+  } else {
+    cat("The intervention is NOT cost-effective under EITHER distribution\n")
+    cat("(ICER > €", wtp_ireland, "/QALY in both scenarios)\n\n")
+  }
+} else {
+  cat("COST-EFFECTIVENESS CONCLUSION: **CHANGES WITH DISTRIBUTION**\n")
+  cat("WARNING: The cost-effectiveness conclusion is sensitive to\n")
+  cat("         distributional choice. This represents substantial\n")
+  cat("         structural uncertainty that should be considered\n")
+  cat("         in decision-making.\n\n")
+}
+
+# Provide interpretation guidance (using PSA-based percent change)
+if (abs(icer_percent_change_psa) < 10) {
+  cat("STRUCTURAL UNCERTAINTY: LOW\n")
+  cat("The ICER changes by less than 10%, indicating that results are\n")
+  cat("robust to the choice between Weibull and gamma distributions.\n")
+} else if (abs(icer_percent_change_psa) < 25) {
+  cat("STRUCTURAL UNCERTAINTY: MODERATE\n")
+  cat("The ICER changes by 10-25%, indicating some structural uncertainty.\n")
+  cat("The cost-effectiveness conclusion is likely stable, but the magnitude\n")
+  cat("of cost-effectiveness varies with distributional choice.\n")
+} else {
+  cat("STRUCTURAL UNCERTAINTY: HIGH\n")
+  cat("The ICER changes by more than 25%, indicating substantial structural\n")
+  cat("uncertainty. Consider additional scenario analyses and potentially\n")
+  cat("other survival distributions. The choice of distribution meaningfully\n")
+  cat("affects the cost-effectiveness conclusion.\n")
+}
+
+# NOTE ON FURTHER ANALYSIS:
+# If structural uncertainty is high, consider:
+#   1. Testing additional distributions (log-normal, log-logistic, etc.)
+#   2. Exploring alternative approaches (spline models, mixture models)
+#   3. Obtaining longer-term follow-up data to reduce extrapolation uncertainty
+#   4. Consulting clinical experts on plausibility of long-term extrapolations
+#   5. Reporting a range of ICERs across plausible distributions
+
+# ============================================================================
+# METHODOLOGICAL NOTE: PSA-BASED RESULTS ARE THE REPORTED BASE CASE
+# ============================================================================
+#
+# **CRITICAL CLARIFICATION FOR MANUSCRIPT:**
+#
+# All results reported in this analysis are PSA-BASED, not deterministic.
+# This includes:
+#   - The "base case" Weibull results: derived from PSA means, not single run
+#   - The gamma scenario results: derived from PSA means, not single run
+#   - All ICERs: calculated from PSA means (ΔCost_mean / ΔQALY_mean)
+#   - All 95% CrIs: derived from PSA distributions
+#
+# This approach:
+#   1. Aligns with reviewer feedback to treat PSA as the effective base case
+#   2. Ensures internal consistency (all reported values reflect uncertainty)
+#   3. Provides more transparent reporting of parameter uncertainty
+#   4. Makes Weibull vs Gamma comparison methodologically rigorous
+#
+# For the paper:
+#   - Table of base-case results → use PSA means from df_out_ce_PA
+#   - Weibull vs Gamma comparison → use psa_comparison_table (saved to CSV)
+#   - All reported ICERs → calculated from PSA means
+#   - All uncertainty bounds → 95% CrIs from PSA distributions
+#
+cat("\n=======================================================\n")
+cat("PSA-BASED GAMMA SCENARIO ANALYSIS COMPLETE\n")
+cat("=======================================================\n")
+cat("All results are PSA-based (means from", n_runs, "simulations)\n")
+cat("Comparison table saved to: output/", comparison_filename, "\n", sep = "")
+cat("=======================================================\n\n")
 
 ```
 
