@@ -4035,8 +4035,11 @@ oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp, curve_choice = cu
 
 ```{r}
 # ============================================================================
-# PSA-BASED GAMMA DISTRIBUTION SCENARIO ANALYSIS - IRELAND ONLY
+# PSA-BASED GAMMA DISTRIBUTION SCENARIO ANALYSIS - COUNTRY-SPECIFIC
 # ============================================================================
+#
+# This analysis runs for whichever country is active (uncommented) in the
+# country parameter blocks. Results will be labeled with the active country name.
 #
 # **CRITICAL METHODOLOGICAL NOTE - PSA-BASED COMPARISON:**
 # This section implements a PROBABILISTIC sensitivity analysis comparing
@@ -4082,8 +4085,9 @@ oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp, curve_choice = cu
 #   analysis should be PSA-based too
 # - More transparent about combined parameter + structural uncertainty
 #
-# NOTE: We only run this for Ireland here. The same approach could be applied
-# to Germany and Spain if needed.
+# NOTE: This analysis will run for whichever country is active (uncommented)
+# in the country parameter blocks at the start of the file. The output filename
+# will automatically include the active country name.
 
 # ============================================================================
 # STEP 1: RUN FULL PSA WITH WEIBULL DISTRIBUTION
@@ -4096,7 +4100,7 @@ oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp, curve_choice = cu
 #
 # df_PA_input already contains Weibull parameters sampled for all n_runs iterations
 #
-cat("Running PSA for WEIBULL distribution...\n")
+cat("Running PSA for WEIBULL distribution (", country_name, ")...\n", sep = "")
 cat("Number of simulations:", n_runs, "\n\n")
 
 # Create data frames to store PSA results for Weibull scenario
@@ -4161,7 +4165,7 @@ weibull_inc_nmb_upper <- quantile(weibull_incremental_nmb, probs = 0.975)
 
 # Display Weibull PSA results
 cat("\n=======================================================\n")
-cat("WEIBULL PSA RESULTS (Ireland) - PSA-BASED\n")
+cat("WEIBULL PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
 cat("=======================================================\n")
 cat("Number of simulations:", n_runs, "\n\n")
 cat("Mean Costs:\n")
@@ -4191,7 +4195,7 @@ cat("=======================================================\n\n")
 # This ensures the comparison isolates STRUCTURAL uncertainty (Weibull vs Gamma)
 # while keeping PARAMETER uncertainty constant across both scenarios.
 #
-cat("Running PSA for GAMMA distribution...\n")
+cat("Running PSA for GAMMA distribution (", country_name, ")...\n", sep = "")
 cat("Number of simulations:", n_runs, "\n\n")
 
 # Create data frames to store PSA results for Gamma scenario
@@ -4255,7 +4259,7 @@ gamma_inc_nmb_upper <- quantile(gamma_incremental_nmb, probs = 0.975)
 
 # Display Gamma PSA results
 cat("\n=======================================================\n")
-cat("GAMMA PSA RESULTS (Ireland) - PSA-BASED\n")
+cat("GAMMA PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
 cat("=======================================================\n")
 cat("Number of simulations:", n_runs, "\n\n")
 cat("Mean Costs:\n")
@@ -4336,13 +4340,15 @@ print(psa_comparison_table, row.names = FALSE)
 cat("=======================================================\n\n")
 
 # Save PSA-based comparison table to CSV for use in paper
+# Filename dynamically includes country name from active country block
+comparison_filename <- paste0("Weibull_vs_Gamma_", country_name, "_PSA.csv")
 write.csv(
   psa_comparison_table,
-  file = file.path("output", "Weibull_vs_Gamma_Ireland_PSA.csv"),
+  file = file.path("output", comparison_filename),
   row.names = FALSE
 )
 
-cat("PSA-based comparison table saved to: output/Weibull_vs_Gamma_Ireland_PSA.csv\n\n")
+cat("PSA-based comparison table saved to: output/", comparison_filename, "\n\n", sep = "")
 
 
 # ============================================================================
@@ -4449,7 +4455,7 @@ cat("\n=======================================================\n")
 cat("PSA-BASED GAMMA SCENARIO ANALYSIS COMPLETE\n")
 cat("=======================================================\n")
 cat("All results are PSA-based (means from", n_runs, "simulations)\n")
-cat("Comparison table saved to: output/Weibull_vs_Gamma_Ireland_PSA.csv\n")
+cat("Comparison table saved to: output/", comparison_filename, "\n", sep = "")
 cat("=======================================================\n\n")
 
 ```
