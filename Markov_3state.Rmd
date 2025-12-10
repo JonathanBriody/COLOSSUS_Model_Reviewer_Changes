@@ -8057,6 +8057,19 @@ m_coef_weibull_OS_SoC <- mvrnorm(
 
 head(m_coef_weibull_OS_SoC)
 
+# ============================================================================
+# SAVE RNG STATE TO PRESERVE ORIGINAL PSA SAMPLING SEQUENCE
+# ============================================================================
+#
+# CRITICAL: We save the random number generator (RNG) state HERE, immediately
+# after Weibull sampling. This captures the exact RNG state that existed in
+# the original code (before gamma distribution was added).
+#
+# After gamma sampling (below), we will RESTORE this state so that all
+# subsequent parameter sampling (HR, costs, utilities) gets the SAME random
+# values as in the original validated results (Table 2 in publication).
+#
+saved_rng_state <- .Random.seed
 
 # ============================================================================
 # GAMMA DISTRIBUTION PARAMETER SAMPLING FOR PSA
@@ -8097,6 +8110,28 @@ m_coef_gamma_OS_SoC <- mvrnorm(
 
 head(m_coef_gamma_OS_SoC)
 
+# ============================================================================
+# RESTORE RNG STATE TO PRESERVE ORIGINAL PSA SAMPLING SEQUENCE
+# ============================================================================
+#
+# CRITICAL: We now restore the RNG state that was saved BEFORE gamma sampling.
+# This ensures that all subsequent parameter sampling (HR, costs, utilities,
+# etc.) uses the EXACT SAME random values as in the original implementation.
+#
+# WHY THIS IS NECESSARY:
+# The gamma sampling above consumed random numbers, which would have shifted
+# all subsequent random draws. By restoring the saved state, we "undo" this
+# shift for the main PSA parameters.
+#
+# RESULT:
+#   1. Weibull parameters: Sampled normally (same as before)
+#   2. Gamma parameters: Sampled using "bonus" random numbers (for scenario analysis)
+#   3. HR, costs, utilities: Sampled from ORIGINAL sequence (matches Table 2)
+#
+# This preserves backward compatibility with published results while adding
+# gamma scenario analysis capability.
+#
+.Random.seed <- saved_rng_state
 
 # Now that we have applied mvrnorm to get a random shape and a random scale we don't need to include HR_FP_SoC in our data.frame to create random probability draws for SoC, because we can just select the shape and scale from m_coef_weibull_SoC so that in our function the updated coef_weibull_shape_SoC and coef_weibull_scale_SoC are used to generate S_FP_SoC with a random value, which will in turn generate transition probabilities under standard of care with a random value.
 
