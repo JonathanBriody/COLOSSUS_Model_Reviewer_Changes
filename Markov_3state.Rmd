@@ -12016,11 +12016,71 @@ if (length(wvg_list) > 0) {
   # Remove row names for cleaner output
   rownames(wvg_consolidated) <- NULL
 
+  # ==========================================================================
+  # CALCULATE PERCENTAGE CHANGE BETWEEN WEIBULL AND GAMMA FOR EACH COUNTRY
+  # ==========================================================================
+  #
+  # HEALTH ECONOMIC RATIONALE:
+  # Percentage change provides a standardized measure of structural uncertainty
+  # that is comparable across countries with different cost structures.
+  #
+  # CALCULATION:
+  # % Change = (Gamma - Weibull) / Weibull * 100
+  #
+  # INTERPRETATION:
+  # - Positive % change in ICER: Gamma yields higher (less favorable) ICER
+
+  # - Negative % change in ICER: Gamma yields lower (more favorable) ICER
+  # - For NMB: Positive change means Gamma is more favorable
+
+  # Initialize percentage change columns with NA
+  wvg_consolidated$ICER_Pct_Change_Gamma_vs_Weibull <- NA
+  wvg_consolidated$NMB_Pct_Change_Gamma_vs_Weibull <- NA
+
+  # Calculate percentage changes for each country
+  for (country in unique(wvg_consolidated$Country)) {
+    # Get row indices for this country
+    country_rows <- which(wvg_consolidated$Country == country)
+    weibull_row <- country_rows[wvg_consolidated$Distribution[country_rows] == "Weibull"]
+    gamma_row <- country_rows[wvg_consolidated$Distribution[country_rows] == "Gamma"]
+
+    if (length(weibull_row) == 1 && length(gamma_row) == 1) {
+      # Get Weibull and Gamma values
+      weibull_icer <- wvg_consolidated$ICER_PSA[weibull_row]
+      gamma_icer <- wvg_consolidated$ICER_PSA[gamma_row]
+      weibull_nmb <- wvg_consolidated$Inc_NMB_Mean[weibull_row]
+      gamma_nmb <- wvg_consolidated$Inc_NMB_Mean[gamma_row]
+
+      # Calculate percentage changes
+      # For ICER: % change from Weibull to Gamma
+      if (!is.na(weibull_icer) && weibull_icer != 0) {
+        icer_pct_change <- (gamma_icer - weibull_icer) / weibull_icer * 100
+      } else {
+        icer_pct_change <- NA
+      }
+
+      # For NMB: % change from Weibull to Gamma
+      # Note: NMB can be negative, so we use absolute value of Weibull as denominator
+      if (!is.na(weibull_nmb) && weibull_nmb != 0) {
+        nmb_pct_change <- (gamma_nmb - weibull_nmb) / abs(weibull_nmb) * 100
+      } else {
+        nmb_pct_change <- NA
+      }
+
+      # Assign to BOTH rows for this country (so the info appears with each distribution)
+      wvg_consolidated$ICER_Pct_Change_Gamma_vs_Weibull[country_rows] <- round(icer_pct_change, 2)
+      wvg_consolidated$NMB_Pct_Change_Gamma_vs_Weibull[country_rows] <- round(nmb_pct_change, 2)
+    }
+  }
+
   cat("\n=======================================================\n")
   cat("CONSOLIDATED WEIBULL VS GAMMA PSA TABLE\n")
   cat("=======================================================\n")
   cat("Countries included:", length(wvg_list), "\n")
   cat("Total rows:", nrow(wvg_consolidated), "(2 per country: Weibull + Gamma)\n\n")
+  cat("New columns added:\n")
+  cat("  - ICER_Pct_Change_Gamma_vs_Weibull: % change in ICER from Weibull to Gamma\n")
+  cat("  - NMB_Pct_Change_Gamma_vs_Weibull:  % change in NMB from Weibull to Gamma\n\n")
 
   # Display the consolidated table
   print(wvg_consolidated, row.names = FALSE)
