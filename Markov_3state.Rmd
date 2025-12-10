@@ -11890,6 +11890,225 @@ if (nrow(psa_consolidated) > 0) {
 ```
 
 ```{r}
+# =============================================================================
+# CONSOLIDATE WEIBULL VS GAMMA PSA RESULTS ACROSS ALL COUNTRIES
+# =============================================================================
+#
+# OVERVIEW:
+# -----------------------------------------------------------------------------
+# This chunk consolidates the Weibull vs Gamma PSA comparison results from all
+# three countries (Ireland, Germany, Spain) into a single table. This mirrors
+# the approach used for PSA_Summary_NMB_All_Countries but focuses on the
+# structural uncertainty analysis comparing distributional assumptions.
+#
+# WORKFLOW (must be completed BEFORE running this chunk):
+# -----------------------------------------------------------------------------
+# STEP 1: Uncomment Ireland country block → Run PSA → Generates:
+#   - output/Weibull_vs_Gamma_Ireland_PSA.csv
+#
+# STEP 2: Uncomment Germany country block → Run PSA → Generates:
+#   - output/Weibull_vs_Gamma_Germany_PSA.csv
+#
+# STEP 3: Uncomment Spain country block → Run PSA → Generates:
+#   - output/Weibull_vs_Gamma_Spain_PSA.csv
+#
+# STEP 4: Run THIS chunk → Consolidates all country results into:
+#   - output/Weibull_vs_Gamma_All_Countries_PSA.csv
+#
+# HEALTH ECONOMIC INTERPRETATION:
+# -----------------------------------------------------------------------------
+# The consolidated table allows assessment of:
+#
+# 1. STRUCTURAL UNCERTAINTY ACROSS COUNTRIES:
+#    Does the choice between Weibull and Gamma distributions affect
+#    cost-effectiveness conclusions differently across healthcare systems?
+#
+# 2. ROBUSTNESS OF DISTRIBUTIONAL CHOICE:
+#    If both distributions yield similar results across all countries,
+#    the model is robust to this source of structural uncertainty.
+#
+# 3. CROSS-COUNTRY TRANSFERABILITY:
+#    Compare how cost-effectiveness varies by country under both
+#    distributional assumptions.
+
+# ============================================================================
+# STEP 1: CHECK WHICH COUNTRY WEIBULL VS GAMMA PSA RESULTS ARE AVAILABLE
+# ============================================================================
+
+# Define file paths for each country's Weibull vs Gamma PSA comparison
+# --------------------------------------------------------------------
+file_wvg_ireland <- file.path("output", "Weibull_vs_Gamma_Ireland_PSA.csv")
+file_wvg_germany <- file.path("output", "Weibull_vs_Gamma_Germany_PSA.csv")
+file_wvg_spain <- file.path("output", "Weibull_vs_Gamma_Spain_PSA.csv")
+
+# Check which files exist
+# -----------------------
+exists_wvg_ireland <- file.exists(file_wvg_ireland)
+exists_wvg_germany <- file.exists(file_wvg_germany)
+exists_wvg_spain <- file.exists(file_wvg_spain)
+
+# Display which country results are available
+# --------------------------------------------
+cat("\n=======================================================\n")
+cat("CONSOLIDATING WEIBULL VS GAMMA PSA RESULTS ACROSS COUNTRIES\n")
+cat("=======================================================\n\n")
+cat("Checking for available Weibull vs Gamma PSA files...\n\n")
+
+# Report availability status for each country
+cat("Ireland:", ifelse(exists_wvg_ireland, "✓ Available", "✗ Not yet generated"), "\n")
+cat("Germany:", ifelse(exists_wvg_germany, "✓ Available", "✗ Not yet generated"), "\n")
+cat("Spain:  ", ifelse(exists_wvg_spain, "✓ Available", "✗ Not yet generated"), "\n\n")
+
+# ============================================================================
+# STEP 2: LOAD AVAILABLE COUNTRY WEIBULL VS GAMMA PSA RESULTS
+# ============================================================================
+
+# Initialize empty list to store country data frames
+wvg_list <- list()
+
+# Define WTP thresholds for each country (for reference in consolidated table)
+# These match the values defined in each country's parameter file
+wtp_ireland <- 45000
+wtp_germany <- 78871
+wtp_spain <- 30000
+
+# Load Ireland data if available
+if (exists_wvg_ireland) {
+  df_wvg_ireland <- read.csv(file_wvg_ireland, stringsAsFactors = FALSE)
+  df_wvg_ireland$Country <- "Ireland"
+  df_wvg_ireland$WTP_Threshold <- wtp_ireland
+  wvg_list[["Ireland"]] <- df_wvg_ireland
+  cat("✓ Loaded Ireland Weibull vs Gamma PSA results (", nrow(df_wvg_ireland), " rows)\n")
+}
+
+# Load Germany data if available
+if (exists_wvg_germany) {
+  df_wvg_germany <- read.csv(file_wvg_germany, stringsAsFactors = FALSE)
+  df_wvg_germany$Country <- "Germany"
+  df_wvg_germany$WTP_Threshold <- wtp_germany
+  wvg_list[["Germany"]] <- df_wvg_germany
+  cat("✓ Loaded Germany Weibull vs Gamma PSA results (", nrow(df_wvg_germany), " rows)\n")
+}
+
+# Load Spain data if available
+if (exists_wvg_spain) {
+  df_wvg_spain <- read.csv(file_wvg_spain, stringsAsFactors = FALSE)
+  df_wvg_spain$Country <- "Spain"
+  df_wvg_spain$WTP_Threshold <- wtp_spain
+  wvg_list[["Spain"]] <- df_wvg_spain
+  cat("✓ Loaded Spain Weibull vs Gamma PSA results (", nrow(df_wvg_spain), " rows)\n")
+}
+
+# ============================================================================
+# STEP 3: COMBINE COUNTRY RESULTS INTO CONSOLIDATED TABLE
+# ============================================================================
+
+if (length(wvg_list) > 0) {
+  # Combine all available country data frames
+  wvg_consolidated <- do.call(rbind, wvg_list)
+
+  # Reorder columns to put Country and WTP_Threshold first
+  # This makes the table easier to read and interpret
+  col_order <- c("Country", "WTP_Threshold", "Distribution",
+                 setdiff(names(wvg_consolidated), c("Country", "WTP_Threshold", "Distribution")))
+  wvg_consolidated <- wvg_consolidated[, col_order]
+
+  # Remove row names for cleaner output
+  rownames(wvg_consolidated) <- NULL
+
+  cat("\n=======================================================\n")
+  cat("CONSOLIDATED WEIBULL VS GAMMA PSA TABLE\n")
+  cat("=======================================================\n")
+  cat("Countries included:", length(wvg_list), "\n")
+  cat("Total rows:", nrow(wvg_consolidated), "(2 per country: Weibull + Gamma)\n\n")
+
+  # Display the consolidated table
+  print(wvg_consolidated, row.names = FALSE)
+
+} else {
+  cat("\n=======================================================\n")
+  cat("WARNING: NO WEIBULL VS GAMMA PSA FILES FOUND\n")
+  cat("=======================================================\n")
+  cat("Please run the PSA analysis for at least one country first.\n")
+  cat("This will generate the Weibull_vs_Gamma_<country>_PSA.csv files.\n\n")
+  wvg_consolidated <- data.frame()
+}
+
+# ============================================================================
+# STEP 4: SAVE CONSOLIDATED TABLE TO CSV
+# ============================================================================
+
+if (nrow(wvg_consolidated) > 0) {
+
+  # Define output file path
+  wvg_consolidated_file <- file.path("output", "Weibull_vs_Gamma_All_Countries_PSA.csv")
+
+  # Write to CSV
+  write.csv(
+    wvg_consolidated,
+    file = wvg_consolidated_file,
+    row.names = FALSE
+  )
+
+  cat("\n=======================================================\n")
+  cat("FILE SAVED SUCCESSFULLY\n")
+  cat("=======================================================\n")
+  cat("Consolidated Weibull vs Gamma PSA results saved to:\n")
+  cat("  ", wvg_consolidated_file, "\n\n")
+
+  # ============================================================================
+  # STEP 5: INTERPRET CROSS-COUNTRY STRUCTURAL UNCERTAINTY
+  # ============================================================================
+
+  cat("=======================================================\n")
+  cat("CROSS-COUNTRY STRUCTURAL UNCERTAINTY SUMMARY\n")
+  cat("=======================================================\n\n")
+
+  # For each country, compare Weibull vs Gamma ICERs
+  for (country in unique(wvg_consolidated$Country)) {
+    country_data <- wvg_consolidated[wvg_consolidated$Country == country, ]
+
+    weibull_icer <- country_data$ICER_PSA[country_data$Distribution == "Weibull"]
+    gamma_icer <- country_data$ICER_PSA[country_data$Distribution == "Gamma"]
+    wtp <- country_data$WTP_Threshold[1]
+
+    if (length(weibull_icer) > 0 && length(gamma_icer) > 0) {
+      icer_diff <- gamma_icer - weibull_icer
+      icer_pct_change <- (gamma_icer - weibull_icer) / weibull_icer * 100
+
+      cat(country, " (WTP: €", format(wtp, big.mark = ","), "):\n", sep = "")
+      cat("  Weibull ICER: €", format(round(weibull_icer, 0), big.mark = ","), "\n", sep = "")
+      cat("  Gamma ICER:   €", format(round(gamma_icer, 0), big.mark = ","), "\n", sep = "")
+      cat("  Difference:   €", format(round(icer_diff, 0), big.mark = ","),
+          " (", round(icer_pct_change, 1), "%)\n", sep = "")
+
+      # Check if conclusion changes
+      weibull_ce <- weibull_icer <= wtp
+      gamma_ce <- gamma_icer <= wtp
+
+      if (weibull_ce == gamma_ce) {
+        if (weibull_ce) {
+          cat("  Conclusion:   Cost-effective under BOTH distributions\n\n")
+        } else {
+          cat("  Conclusion:   NOT cost-effective under EITHER distribution\n\n")
+        }
+      } else {
+        cat("  Conclusion:   **CHANGES with distribution choice**\n\n")
+      }
+    }
+  }
+
+  cat("=======================================================\n")
+  cat("WEIBULL VS GAMMA ALL COUNTRIES CONSOLIDATION COMPLETE\n")
+  cat("=======================================================\n\n")
+
+} else {
+  cat("No consolidated file created (no data available).\n\n")
+}
+
+```
+
+```{r}
 
 #09.2 Create PSA object for dampack
 
