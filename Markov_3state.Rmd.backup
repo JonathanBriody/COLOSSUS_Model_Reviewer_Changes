@@ -3,10 +3,10 @@ title: 'Bevacizumab for Metastatic Colorectal Cancer with Chromosomal Instabilit
   An Cost-Effectiveness Analysis of a Novel Subtype across the COLOSSUS Partner Countries'
 author: "Jonathan Briody (1) | Kathleen Bennett (1) | Lesley Tilson (2) | More to be added"
 output:
-  word_document: default
   html_document: 
     keep_md: yes
   pdf_document: default
+  word_document: default
 editor_options:
   markdown:
     wrap: sentence
@@ -774,177 +774,37 @@ get_utility_scenario <- function(
 ```{r}
 
 #===============================================================================
-# COUNTRY-SPECIFIC PARAMETERS
+# NOTE: COUNTRY-SPECIFIC ANALYSIS HAS BEEN REFACTORED
 #===============================================================================
 #
-# This section defines country-specific costs, WTP thresholds, and discount rates
-# for Ireland, Germany, and Spain.
+# Previously, this section contained manual country blocks for Ireland, Germany,
+# and Spain that required commenting/uncommenting to switch between countries.
 #
-# STRATEGY:
-# 1. A helper function get_country_params() returns all country-specific parameters
-# 2. By default, Ireland parameters are loaded (so variables exist for downstream chunks)
-# 3. To analyze a different country, manually change DEFAULT_COUNTRY below
-# 4. To run all countries automatically, see the utility scenario analysis chunk
-#    at the end of this document
+# This has been REPLACED with an automated approach using the helper function
+# run_country_analysis() which is defined and called later in this document
+# (see section "HELPER FUNCTION AND MAIN COUNTRY ANALYSIS" around line 4660).
+#
+# BENEFITS OF NEW APPROACH:
+# - No manual editing required to run all countries
+# - All countries analyzed automatically with identical model structure
+# - Results automatically combined for easy comparison
+# - Reduced risk of errors from manual code changes
+# - Better reproducibility and transparency
+#
+# The country-specific analysis now happens AFTER all global parameters
+# (hazard ratios, AE probabilities, survival coefficients, etc.) are defined.
+#
+# For backward compatibility with existing code chunks that expect certain
+# variables to be defined (e.g., OWSA, TWSA, PSA), default country variables
+# are set after the main country loop runs.
 #
 #===============================================================================
+
 
 # Create output directory if it doesn't exist
 if (!dir.exists("output")) {
   dir.create("output", recursive = TRUE)
 }
-
-
-#===============================================================================
-# HELPER FUNCTION: get_country_params()
-#===============================================================================
-#
-# Returns a list of country-specific parameters for the specified country.
-#
-# PARAMETERS:
-#   country: "Ireland", "Germany", or "Spain"
-#
-# RETURNS:
-#   Named list with:
-#     - country_name: Country identifier
-#     - c_PFS_Folfox: Cost of FOLFOX per 14-day cycle
-#     - c_PFS_Bevacizumab: Cost of Bevacizumab per cycle
-#     - c_OS_Folfiri: Cost of FOLFIRI per cycle
-#     - administration_cost: IV administration cost per cycle
-#     - subtyping_test_cost: One-time RAS/BRAF subtyping test cost
-#     - c_AE1: Cost of treating leukopenia (grade 3/4)
-#     - c_AE2: Cost of treating diarrhea (grade 3/4)
-#     - c_AE3: Cost of treating nausea/vomiting (grade 3/4)
-#     - n_wtp: Willingness-to-pay threshold (€/QALY)
-#     - country_discount_rate: Annual discount rate (base case)
-#     - country_max_discount_rate: Annual discount rate (upper bound for sensitivity)
-#     - country_min_discount_rate: Annual discount rate (lower bound for sensitivity)
-#
-get_country_params <- function(country) {
-
-  if (country == "Ireland") {
-    return(list(
-      country_name = "Ireland",
-
-      # 1. Cost of treatment in this country (2024 values)
-      c_PFS_Folfox = 157.77,
-      c_PFS_Bevacizumab = 1425.84,
-      c_OS_Folfiri = 167.10,
-      administration_cost = 406.50,
-      subtyping_test_cost = 400,
-
-      # 2. Cost of treating adverse events conditional on occurrence
-      c_AE1 = 3485.23,  # Leukopenia
-      c_AE2 = 1792.82,  # Diarrhea
-      c_AE3 = 502.69,   # Nausea/vomiting
-
-      # 3. Willingness to pay threshold
-      n_wtp = 45000,
-
-      # 4. Country-specific discount rates
-      country_discount_rate = 0.04,
-      country_max_discount_rate = 0.08,
-      country_min_discount_rate = 0.00
-    ))
-
-  } else if (country == "Germany") {
-
-    # Germany costs received as monthly values, converted to 14-day cycles
-    return(list(
-      country_name = "Germany",
-
-      # 1. Cost of treatment in this country (2024 values)
-      # Monthly costs converted to 14-day cycles: (monthly / 30) * 14
-      c_PFS_Folfox = ((1406.37 / 30) * 14),
-      c_PFS_Bevacizumab = ((3252.19 / 30) * 14),
-      c_OS_Folfiri = ((1442.70 / 30) * 14),
-      administration_cost = 1927.72,
-      subtyping_test_cost = 400,
-
-      # 2. Cost of treating adverse events conditional on occurrence
-      c_AE1 = 4188.31,  # Leukopenia
-      c_AE2 = 1982.68,  # Diarrhea
-      c_AE3 = 1307.72,  # Nausea/vomiting
-
-      # 3. Willingness to pay threshold
-      n_wtp = 78871,
-
-      # 4. Country-specific discount rates
-      country_discount_rate = 0.03,
-      country_max_discount_rate = 0.06,
-      country_min_discount_rate = 0.00
-    ))
-
-  } else if (country == "Spain") {
-    return(list(
-      country_name = "Spain",
-
-      # 1. Cost of treatment in this country (2024 values)
-      c_PFS_Folfox = 323.39,
-      c_PFS_Bevacizumab = 1399.33,
-      c_OS_Folfiri = 147.31,
-      administration_cost = 332.39,
-      subtyping_test_cost = 400,
-
-      # 2. Cost of treating adverse events conditional on occurrence
-      c_AE1 = 5710.97,  # Leukopenia
-      c_AE2 = 305.55,   # Diarrhea
-      c_AE3 = 35.11,    # Nausea/vomiting
-
-      # 3. Willingness to pay threshold
-      n_wtp = 30000,
-
-      # 4. Country-specific discount rates
-      country_discount_rate = 0.03,
-      country_max_discount_rate = 0.06,
-      country_min_discount_rate = 0.00
-    ))
-
-  } else {
-    stop(paste("Unknown country:", country,
-               "\nValid options are: 'Ireland', 'Germany', 'Spain'"))
-  }
-}
-
-
-#===============================================================================
-# LOAD COUNTRY-SPECIFIC PARAMETERS
-#===============================================================================
-#
-# Country-specific parameters are stored in separate files:
-#   - params_Ireland.R
-#   - params_Germany.R
-#   - params_Spain.R
-#
-# TO CHANGE COUNTRY: Uncomment ONE of the source() lines below and comment the others
-#
-# Each parameter file defines:
-#   - country_name: Country identifier
-#   - Treatment costs (c_PFS_Folfox, c_PFS_Bevacizumab, c_OS_Folfiri, etc.)
-#   - Adverse event costs (c_AE1, c_AE2, c_AE3)
-#   - Willingness-to-pay threshold (n_wtp)
-#   - Discount rates (country_discount_rate, country_max_discount_rate, country_min_discount_rate)
-#
-# IMPORTANT: All outputs will be saved with country-specific filenames to prevent
-#            overwriting when running multiple countries sequentially.
-#
-#===============================================================================
-
-# Uncomment ONE country (leave the others commented):
-# source("params_Ireland.R")
- source("params_Germany.R")
-# source("params_Spain.R")
-
-# Print confirmation
-cat("\n")
-cat("================================================================================\n")
-cat("COUNTRY-SPECIFIC PARAMETERS LOADED\n")
-cat("================================================================================\n")
-cat("Country:", country_name, "\n")
-cat("WTP threshold: €", format(n_wtp, big.mark=","), " per QALY\n", sep="")
-cat("Discount rate:", country_discount_rate, "(range:", country_min_discount_rate, "-", country_max_discount_rate, ")\n")
-cat("================================================================================\n")
-cat("\n")
 
 
 
@@ -1153,10 +1013,10 @@ survfit2(Surv(time, status) ~ 1, data = df_TTP) %>% ggsurvfit() +
   labs(
     x = "Days",
     y = "Progression Free survival probability"
-  ) +
+  ) + 
   add_risktable()
 #print(plot)
-ggsave(file.path("output", paste0("Baseline_PFS_Curves_", country_name, ".png")), width = 8, height = 4, dpi=600)
+ggsave(file.path("output", "Baseline_PFS_Curves.png"), width = 8, height = 4, dpi=600)
 #dev.off()
 while (!is.null(dev.list()))  dev.off()
 
@@ -1175,9 +1035,9 @@ survfit2(Surv(time, status) ~ 1, data = df_TTD) %>% ggsurvfit() +
   labs(
     x = "Days",
     y = "Overall survival probability"
-  ) +
+  ) + 
   add_risktable()
-ggsave(file.path("output", paste0("Baseline_OS_Curves_", country_name, ".png")), width = 4, height = 4, dpi=600)
+ggsave(file.path("output", "Baseline_OS_Curves.png"), width = 4, height = 4, dpi=600)
 #png(paste("Baseline_OS_Curves", ".png"))
 #dev.off()
 while (!is.null(dev.list()))  dev.off()
@@ -1949,7 +1809,7 @@ survfit2(Surv(time, status) ~ group, data = df_combined_TTP) %>% ggsurvfit() +
   theme_minimal()
 
 # Save the plot
-ggsave(file.path("output", paste0("Baseline_PFS_Curves_BothEXPANDSOC_", country_name, ".png")), width = 8, height = 6, dpi = 600)
+ggsave(file.path("output", "Baseline_PFS_Curves_BothEXPANDSOC.png"), width = 8, height = 6, dpi = 600)
 
 # Here I update the height of the image to push the title closer to the middle.
 
@@ -1993,7 +1853,7 @@ survfit2(Surv(time, status) ~ group, data = df_combined_TTD) %>% ggsurvfit() +
 # [1]    0  319  638  957 1276 1595 1914 2233 2552 2871
 
 # Save the plot
-ggsave(file.path("output", paste0("Baseline_OS_Curves_BothEXPANDSOC_", country_name, ".png")), width = 8, height = 4, dpi = 600)
+ggsave(file.path("output", "Baseline_OS_Curves_BothEXPANDSOC.png"), width = 8, height = 4, dpi = 600)
 
 # Close any remaining graphics devices
 while (!is.null(dev.list())) dev.off()
@@ -2503,24 +2363,18 @@ P_OSD_Exp   <- 0.17 # Probability of dying when in OS.
 
 # I pursued this avenue and it was too complicated, so instead I just define the parameters that vary in the Rmarkdown file that calls this file.
 
-# Basically, what I do is set these parameters equal to the costs for the country I am interested in, in the Markdown file that calls this file, and then run this current file with the parameter names from the Rmarkdown file subbed in for costs and other country-specific values. Then I repeat this for each country I am interested in.
+# Basically, what I do is set these parameters equal to the costs for the country I am interested in, in the Markdown file that calls this file, and then run this current file with the parameter names from the Rmarkdown file subbed in for costs and other country-specific values. Then I repeat this for each country I am interested in. 
 
-# NOTE: The lines below are COMMENTED OUT as of the run_country_analysis() refactoring.
-# With the new approach, country-specific costs are defined INSIDE the run_country_analysis()
-# function with a _country suffix (e.g., c_PFS_Folfox_country), then passed to the model
-# engine via the l_params_all list. These old lines would fail because c_PFS_Folfox etc.
-# don't exist in the global environment anymore.
+c_PFS_Folfox <- c_PFS_Folfox 
+c_PFS_Bevacizumab <- c_PFS_Bevacizumab  
+c_OS_Folfiri <- c_OS_Folfiri  
+administration_cost <- administration_cost  
 
-# c_PFS_Folfox <- c_PFS_Folfox
-# c_PFS_Bevacizumab <- c_PFS_Bevacizumab
-# c_OS_Folfiri <- c_OS_Folfiri
-# administration_cost <- administration_cost
-#
-#
-# c_F_SoC       <- administration_cost + c_PFS_Folfox  # cost of one cycle in PFS state under standard of care
-# c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment
-# c_P       <- c_OS_Folfiri  + administration_cost# cost of one cycle in progression state (I assume in OS everyone gets the same treatment so it costs everyone the same to be treated).
-# c_D       <- 0     # cost of one cycle in dead state
+
+c_F_SoC       <- administration_cost + c_PFS_Folfox  # cost of one cycle in PFS state under standard of care
+c_F_Exp       <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab # cost of one cycle in PFS state under the experimental treatment 
+c_P       <- c_OS_Folfiri  + administration_cost# cost of one cycle in progression state (I assume in OS everyone gets the same treatment so it costs everyone the same to be treated).
+c_D       <- 0     # cost of one cycle in dead state
 
 
 
@@ -2645,20 +2499,16 @@ u_D       <- 0         # Utility when dead
 
 # 4. Country-specific discount rate:
 
-# NOTE: The lines below are COMMENTED OUT as of the run_country_analysis() refactoring.
-# With the new approach, discount rates are defined INSIDE the run_country_analysis()
-# function and passed to the model via the l_params_all list.
-
 # Discounting factors
-d_c             <- country_discount_rate
+d_c             <- country_discount_rate                          
 # discount rate for costs (per year)
-d_e             <- country_discount_rate
+d_e             <- country_discount_rate                          
 # discount rate for QALYs (per year)
 
 # Discount weight (equal discounting is assumed for costs and effects):
 
-# v_dwc <- 1 / (1 + d_c) ^ (0:n_cycle)
-# v_dwe <- 1 / (1 + d_e) ^ (0:n_cycle)
+# v_dwc <- 1 / (1 + d_c) ^ (0:n_cycle) 
+# v_dwe <- 1 / (1 + d_e) ^ (0:n_cycle) 
 
 # This was my initial discount weight vector, but, I've updated this and do this later on now 
 
@@ -3008,7 +2858,7 @@ v_names_states_updated <- c("First-Line", "Second-Line", "Death")
 v_names_states_updated
 
 # Open a PNG device
-png(paste0("Markov_Cohort_Traces_", country_name, ".png"), width = 8, height = 6,  units = "in", res = 600)
+png("Markov_Cohort_Traces.png", width = 8, height = 6,  units = "in", res = 600)
 
 # res = 600 sets the resolution to 600 DPI, which is higher than the default 300 DPI. You can adjust this value to achieve the desired resolution.
 
@@ -3509,9 +3359,10 @@ p_OSA3_FOLFIRI <- P_14
 
 
 # 2. Cost of treating the AE conditional on it occurring
-# NOTE: c_AE1, c_AE2, c_AE3 are defined in the country-specific blocks
-# (lines ~5148-5174) or inside run_country_analysis() function.
-# No need to reassign them here.
+c_AE1 <- c_AE1
+c_AE2 <- c_AE2
+c_AE3 <- c_AE3 
+
 
 # I don't need to update these costs when including adverse events in the OS state, because the adverse events people experiece are the same three described above, and because these are event specific costs we assume their costs are the same in PFS or OS.
 
@@ -3990,195 +3841,13 @@ u_OS<-u_P-p_OSA1_FOLFIRI*u_AE1_OS*Duration_AE - p_OSA2_FOLFIRI*u_AE2_OS*Duration
 
 
 
-# ==============================================================================
-# INITIALIZE BASE STATE COSTS (Drug Acquisition + Administration)
-# ==============================================================================
-#
-# HEALTH ECONOMIC RATIONALE:
-# In a cost-effectiveness model, the total cost per cycle in each health state
-# comprises multiple components:
-#   1. Drug acquisition costs (the chemotherapy regimens)
-#   2. Administration costs (IV infusion, nursing time, facility overhead)
-#   3. Expected adverse event (AE) costs (probability-weighted treatment costs for AEs)
-#
-# We initialize the BASE state costs here by combining drug and administration costs.
-# These represent the core costs incurred by patients in each health state before
-# accounting for the additional expected costs due to adverse events.
-#
-# After initialization, we will ADD the expected AE costs (probability × one-time cost).
-# This approach separates the deterministic treatment costs from the probabilistic
-# AE-related costs, improving transparency and maintainability.
-#
-# COUNTRY-SPECIFIC ALIGNMENT:
-# These cost variables (c_PFS_Folfox, c_PFS_Bevacizumab, c_OS_Folfiri, administration_cost)
-# are set by the active country block (Ireland, Germany, or Spain) earlier in the script,
-# or are passed via the run_country_analysis() helper function when running automated
-# country loops. The country-specific inputs are already loaded into the environment
-# at this point, ensuring that the base costs reflect the correct jurisdiction.
-#
-# ------------------------------------------------------------------------------
-
-# SAFETY CHECK: Ensure country-specific parameters are loaded
-# If running chunks individually, automatically load default country parameters
-# to prevent "object not found" errors
-if (!exists("administration_cost") || !exists("c_PFS_Folfox") || !exists("c_PFS_Bevacizumab") || !exists("c_OS_Folfiri")) {
-
-  cat("\n")
-  cat("================================================================================\n")
-  cat("AUTO-LOADING COUNTRY-SPECIFIC PARAMETERS\n")
-  cat("================================================================================\n")
-  cat("Country-specific parameters were not found in the environment.\n")
-  cat("Loading default parameters for Ireland...\n")
-  cat("\n")
-  cat("NOTE: If you intended to analyze a different country (Germany or Spain),\n")
-  cat("      please run the 'COUNTRY-SPECIFIC PARAMETERS' chunk (around line 774)\n")
-  cat("      first and set DEFAULT_COUNTRY to your desired country.\n")
-  cat("================================================================================\n")
-  cat("\n")
-
-  # Check if get_country_params() function exists
-  if (!exists("get_country_params")) {
-    stop("\n\n",
-         "================================================================================\n",
-         "ERROR: get_country_params() function not defined!\n",
-         "================================================================================\n",
-         "The helper function get_country_params() has not been defined yet.\n",
-         "\n",
-         "SOLUTION:\n",
-         "You must first run the 'COUNTRY-SPECIFIC PARAMETERS' chunk\n",
-         "(starting around line 774) which defines this function.\n",
-         "\n",
-         "If knitting the entire document, this error indicates a structural problem.\n",
-         "Please report this as a bug.\n",
-         "================================================================================\n")
-  }
-
-  # Load default Ireland parameters
-  params <- get_country_params("Ireland")
-
-  # Unpack parameters into individual variables
-  country_name            <- params$country_name
-  c_PFS_Folfox           <- params$c_PFS_Folfox
-  c_PFS_Bevacizumab      <- params$c_PFS_Bevacizumab
-  c_OS_Folfiri           <- params$c_OS_Folfiri
-  administration_cost     <- params$administration_cost
-  subtyping_test_cost    <- params$subtyping_test_cost
-  c_AE1                  <- params$c_AE1
-  c_AE2                  <- params$c_AE2
-  c_AE3                  <- params$c_AE3
-  n_wtp                  <- params$n_wtp
-  country_discount_rate      <- params$country_discount_rate
-  country_max_discount_rate  <- params$country_max_discount_rate
-  country_min_discount_rate  <- params$country_min_discount_rate
-
-  cat("Default parameters loaded successfully for:", country_name, "\n")
-  cat("\n")
-}
-
-# c_F_SoC: Cost per cycle in the PFS (progression-free survival) state under
-#          standard of care (FOLFOX-4 regimen)
-#
-# COMPOSITION:
-#   - c_PFS_Folfox: Drug acquisition cost for FOLFOX-4 per 14-day cycle
-#   - administration_cost: IV administration cost per cycle (nursing, facility, etc.)
-#
-# This represents the baseline cost for patients who are progression-free and
-# receiving first-line standard-of-care chemotherapy (FOLFOX-4 only, no bevacizumab).
-c_F_SoC <- administration_cost + c_PFS_Folfox
+c_F_SoC<-c_F_SoC +p_FA1_STD*c_AE1 +p_FA2_STD*c_AE2 +p_FA3_STD*c_AE3
+c_F_Exp<-c_F_Exp +p_FA1_EXPR*c_AE1 +p_FA2_EXPR*c_AE2 +p_FA3_EXPR*c_AE3
 
 
-# c_F_Exp: Cost per cycle in the PFS state under experimental treatment
-#          (FOLFOX-4 + Bevacizumab)
-#
-# COMPOSITION:
-#   - c_PFS_Folfox: Drug acquisition cost for FOLFOX-4 per 14-day cycle
-#   - c_PFS_Bevacizumab: Drug acquisition cost for bevacizumab (5 mg/kg) per cycle
-#   - administration_cost: IV administration cost per cycle
-#
-# This represents the baseline cost for patients who are progression-free and
-# receiving the experimental first-line treatment (FOLFOX-4 plus bevacizumab).
-# Bevacizumab is a biologic therapy added to standard chemotherapy, which significantly
-# increases the drug acquisition cost but may improve progression-free survival.
-c_F_Exp <- administration_cost + c_PFS_Folfox + c_PFS_Bevacizumab
+# If I am going to include AE's in OS, I will also need to include the costs of these AEs in OS, much like the above:
 
-
-# c_P: Cost per cycle in the OS (overall survival / progressed) state
-#
-# COMPOSITION:
-#   - c_OS_Folfiri: Drug acquisition cost for FOLFIRI per 14-day cycle
-#   - administration_cost: IV administration cost per cycle
-#
-# This represents the baseline cost for patients who have progressed beyond first-line
-# therapy and are now receiving second-line treatment (FOLFIRI). In our model, ALL
-# patients receive the same second-line regimen after progression, regardless of whether
-# they initially received FOLFOX alone (SoC) or FOLFOX + bevacizumab (Exp). Therefore,
-# c_P is identical for both strategies once patients enter the progressed/OS state.
-c_P <- c_OS_Folfiri + administration_cost
-
-
-# c_D: Cost per cycle in the Dead state
-#
-# COMPOSITION:
-#   - No costs (patients who are dead incur no further treatment or healthcare costs)
-#
-# This is set to 0 as being in the dead state has no ongoing costs. This is standard
-# practice in health economic modeling.
-c_D <- 0
-
-
-# ==============================================================================
-# ADD EXPECTED ADVERSE EVENT COSTS TO BASE STATE COSTS
-# ==============================================================================
-#
-# HEALTH ECONOMIC RATIONALE:
-# Adverse events (AEs) impose additional costs on the healthcare system beyond the
-# routine costs of drug acquisition and administration. Patients may experience AEs
-# such as leukopenia, diarrhea, and vomiting, which require medical intervention
-# (hospitalization, supportive care, medications).
-#
-# The EXPECTED cost of AEs per cycle is calculated as:
-#   Expected AE cost = Probability(AE) × Cost(treating the AE)
-#
-# We model three key AEs (AE1: Leukopenia, AE2: Diarrhea, AE3: Vomiting), each with:
-#   - A probability of occurrence per cycle (p_FA1, p_FA2, p_FA3)
-#   - A one-time treatment cost if the AE occurs (c_AE1, c_AE2, c_AE3)
-#
-# AE probabilities differ by:
-#   1. Treatment regimen (SoC vs Experimental in PFS; FOLFIRI in OS)
-#   2. Health state (PFS vs OS)
-#
-# AE costs (c_AE1, c_AE2, c_AE3) are country-specific and set by the active country block.
-#
-# IMPORTANT MODELING ASSUMPTION:
-# These probabilities represent the OVERALL probability of experiencing the AE during
-# treatment (not a per-cycle recurring probability). Therefore, the AE cost is applied
-# as a one-time expected cost added to the per-cycle state cost. This follows guidance
-# from our collaborator Qiushi (see comment above) and reflects how AE incidence was
-# reported in the source clinical trial (% of patients experiencing the AE during or
-# within 30 days of treatment, converted to 14-day cycle probabilities using an
-# exponential hazard transformation).
-#
-# ------------------------------------------------------------------------------
-
-# Adjust c_F_SoC (PFS state, standard of care) for expected AE costs
-# Patients on FOLFOX-4 alone have probabilities p_FA1_STD, p_FA2_STD, p_FA3_STD
-# of experiencing AE1, AE2, and AE3, respectively.
-c_F_SoC <- c_F_SoC + p_FA1_STD*c_AE1 + p_FA2_STD*c_AE2 + p_FA3_STD*c_AE3
-
-
-# Adjust c_F_Exp (PFS state, experimental treatment) for expected AE costs
-# Patients on FOLFOX-4 + bevacizumab have DIFFERENT AE probabilities
-# (p_FA1_EXPR, p_FA2_EXPR, p_FA3_EXPR), reflecting the toxicity profile of the
-# combination regimen. Bevacizumab may alter the incidence of certain AEs.
-c_F_Exp <- c_F_Exp + p_FA1_EXPR*c_AE1 + p_FA2_EXPR*c_AE2 + p_FA3_EXPR*c_AE3
-
-
-# Adjust c_P (OS/progressed state) for expected AE costs
-# ALL patients in the progressed state receive FOLFIRI as second-line therapy,
-# regardless of their initial treatment assignment. Therefore, both SoC and Exp
-# patients face the same AE probabilities in this state (p_OSA1_FOLFIRI, p_OSA2_FOLFIRI,
-# p_OSA3_FOLFIRI), and c_P is adjusted identically for both strategies.
-c_P <- c_P + p_OSA1_FOLFIRI*c_AE1 + p_OSA2_FOLFIRI*c_AE2 + p_OSA3_FOLFIRI*c_AE3
+c_P<-c_P+p_OSA1_FOLFIRI*c_AE1 +p_OSA2_FOLFIRI*c_AE2 +p_OSA3_FOLFIRI*c_AE3
 
 
 
@@ -4927,608 +4596,155 @@ curve_choice <- "weibull"
 # If I updated utility for AE above, then I'll have to take that into account for u_F below:
 
 #===============================================================================
-# HELPER FUNCTION AND MAIN COUNTRY ANALYSIS
-#===============================================================================
-#
-# This section defines run_country_analysis() - a helper function that
-# encapsulates the entire country-specific analysis workflow.
-#
-# REPLACES: The previous manual country blocks (formerly at lines 774-870)
-#           and single-country utility scenario application
-#
-# NEW APPROACH: Automated analysis of all three countries with identical
-#               model structure, eliminating manual code editing
-#
+# DEFINE UTILITY SCENARIO FLAG
 #===============================================================================
 
+# This flag controls which utility values are used in the model:
+#   - "ramsey_basecase"           → Use Ramsey et al. (2000) values (0.85, 0.65) unchanged
+#   - "population_norm_adjusted"  → Use mCRC multipliers × country/age population norms
+#
+# DEFAULT: Use Ramsey base case (preserves all published results)
+utility_scenario <- "ramsey_basecase"
 
-#===============================================================================
-# HELPER FUNCTION: run_country_analysis()
-#===============================================================================
+# TO RUN POPULATION NORM SCENARIO: Uncomment the line below
+# utility_scenario <- "population_norm_adjusted"
 
-run_country_analysis <- function(
-  country_name,
-  utility_scenario = "ramsey_basecase",
-  patient_age = 65,
-  curve_choice_param = "weibull"
-) {
-  # ============================================================================
-  # PURPOSE:
-  # --------
-  # This function encapsulates the entire country-specific CEA workflow:
-  # 1. Set country-specific costs, discount rates, and WTP threshold
-  # 2. Obtain utilities via get_utility_scenario()
-  # 3. Build complete parameter list (l_params_all)
-  # 4. Run oncologySemiMarkov() model
-  # 5. Extract and structure results
-  # 6. Return results as a single-row data frame
-  #
-  # HEALTH-ECONOMIC RATIONALE:
-  # --------------------------
-  # Separating country-specific parameterisation from model logic ensures:
-  # - Consistency: All countries use identical model structure and methods
-  # - Transparency: Parameter differences are explicit and documented
-  # - Reproducibility: Analyses can be re-run programmatically
-  # - Flexibility: Easy to add new countries or modify existing parameters
-  #
-  # The base-case model structure remains unchanged for each country. Only the
-  # country-specific inputs (costs, discount rates, WTP thresholds, population
-  # norms) differ across jurisdictions.
-  #
-  # PARAMETERS:
-  # -----------
-  # @param country_name: "Ireland", "Germany", or "Spain"
-  # @param utility_scenario: "ramsey_basecase" or "population_norm_adjusted"
-  # @param patient_age: Age for population norm lookup (default 65)
-  # @param curve_choice_param: "weibull" or "gamma" (default "weibull")
-  #
-  # RETURNS:
-  # --------
-  # Single-row data frame with columns: country, utility_scenario, u_PFS, u_PD,
-  # cost_SoC, cost_Exp, qaly_SoC, qaly_Exp, inc_cost, inc_qaly, icer, nmb, n_wtp
-  #
-  # DEPENDENCIES:
-  # -------------
-  # Assumes the following exist in global environment:
-  # - Functions: get_utility_scenario(), oncologySemiMarkov()
-  # - Data: df_popnorm
-  # - Global parameters: HR_FP_Exp, HR_FP_SoC, HR_PD_Exp, HR_PD_SoC, P_OSD_SoC,
-  #   P_OSD_Exp, p_FA1_STD, p_FA2_STD, p_FA3_STD, p_FA1_EXPR, p_FA2_EXPR,
-  #   p_FA3_EXPR, p_OSA1_FOLFIRI, p_OSA2_FOLFIRI, p_OSA3_FOLFIRI, c_D,
-  #   AE1_DisUtil, AE2_DisUtil, AE3_DisUtil, u_D, n_cycle, t_cycle
-  # - Survival coefficients: coef_weibull_shape_SoC, coef_weibull_scale_SoC,
-  #   coef_TTD_weibull_shape_SoC, coef_TTD_weibull_scale_SoC (and gamma versions)
-  # ============================================================================
-
-  # Print header
-  # ------------
-  cat("\n")
-  cat("========================================================================\n")
-  cat("RUNNING COUNTRY ANALYSIS\n")
-  cat("========================================================================\n")
-  cat("Country:          ", country_name, "\n")
-  cat("Utility scenario: ", utility_scenario, "\n")
-  cat("Curve choice:     ", curve_choice_param, "\n")
-  cat("------------------------------------------------------------------------\n")
-
-  #=============================================================================
-  # STEP 1: SET COUNTRY-SPECIFIC PARAMETERS
-  #=============================================================================
-  # Each country has different costs, discount rates, and WTP thresholds
-  # reflecting local drug pricing, healthcare systems, and policy guidelines
-  #=============================================================================
-
-  if (country_name == "Ireland") {
-    # IRELAND PARAMETERS
-    # ------------------
-    # Source: Irish drug pricing and HIQA guidelines
-
-    # Treatment costs per 14-day cycle (€)
-    c_PFS_Folfox_country <- 157.77          # FOLFOX-4 regimen
-    c_PFS_Bevacizumab_country <- 1425.84    # Bevacizumab (5mg/kg)
-    c_OS_Folfiri_country <- 167.10          # FOLFIRI regimen
-    administration_cost_country <- 406.50    # IV administration per cycle
-    subtyping_test_cost_country <- 400       # RAS testing (one-time)
-
-    # Adverse event costs (€) - one-time costs when AE occurs
-    c_AE1_country <- 3485.23  # Grade 3+ neutropenia management
-    c_AE2_country <- 1792.82  # Grade 3+ diarrhea management
-    c_AE3_country <- 502.69   # Grade 3+ nausea/vomiting management
-
-    # Willingness-to-pay threshold (€/QALY)
-    n_wtp_country <- 45000  # HIQA guideline for Ireland
-
-    # Discount rate (annual)
-    country_discount_rate_val <- 0.04  # 4% for costs and effects (HIQA)
-
-  } else if (country_name == "Germany") {
-    # GERMANY PARAMETERS
-    # ------------------
-    # Source: German drug pricing and IQWiG guidelines
-    # Note: Costs received as monthly values, converted to 14-day cycles
-
-    # Treatment costs per 14-day cycle (€)
-    # Conversion formula: (monthly cost / 30 days) × 14 days
-    c_PFS_Folfox_country <- ((1406.37 / 30) * 14)
-    c_PFS_Bevacizumab_country <- ((3252.19 / 30) * 14)
-    c_OS_Folfiri_country <- ((1442.70 / 30) * 14)
-    administration_cost_country <- 1927.72
-    subtyping_test_cost_country <- 400
-
-    # Adverse event costs (€)
-    c_AE1_country <- 4188.31
-    c_AE2_country <- 1982.68
-    c_AE3_country <- 1307.72
-
-    # Willingness-to-pay threshold (€/QALY)
-    n_wtp_country <- 78871  # Implicit threshold from IQWiG assessments
-
-    # Discount rate (annual)
-    country_discount_rate_val <- 0.03  # 3% for costs and effects (IQWiG)
-
-  } else if (country_name == "Spain") {
-    # SPAIN PARAMETERS
-    # ----------------
-    # Source: Spanish drug pricing and health economic guidelines
-
-    # Treatment costs per 14-day cycle (€)
-    c_PFS_Folfox_country <- 323.39
-    c_PFS_Bevacizumab_country <- 1399.33
-    c_OS_Folfiri_country <- 147.31
-    administration_cost_country <- 332.39
-    subtyping_test_cost_country <- 400
-
-    # Adverse event costs (€)
-    c_AE1_country <- 5710.97
-    c_AE2_country <- 305.55
-    c_AE3_country <- 35.11
-
-    # Willingness-to-pay threshold (€/QALY)
-    n_wtp_country <- 30000  # Commonly cited threshold for Spain
-
-    # Discount rate (annual)
-    country_discount_rate_val <- 0.03  # 3% for costs and effects
-
-  } else {
-    # ERROR HANDLING: Unknown country
-    stop("Unknown country: ", country_name,
-         ". Must be 'Ireland', 'Germany', or 'Spain'.")
-  }
-
-  # Convert annual discount rates to daily rates
-  # ---------------------------------------------
-  # Model operates on 14-day cycles, so rates must be daily
-  # Formula: daily_rate = annual_rate / 365
-  d_c_country <- country_discount_rate_val / 365  # Daily rate for costs
-  d_e_country <- country_discount_rate_val / 365  # Daily rate for effects
-
-  cat("Treatment costs:   FOLFOX = €", round(c_PFS_Folfox_country, 2),
-      ", Bev = €", round(c_PFS_Bevacizumab_country, 2), "\n", sep = "")
-  cat("WTP threshold:     €", n_wtp_country, " per QALY\n", sep = "")
-  cat("Discount rate:     ", country_discount_rate_val * 100, "% (annual)\n", sep = "")
-
-  #=============================================================================
-  # STEP 2: OBTAIN SCENARIO-SPECIFIC UTILITIES
-  #=============================================================================
-  # Call get_utility_scenario() to get PFS and PD utilities based on:
-  # - Country (for population norm lookup if needed)
-  # - Age (representative patient age, typically 65 for mCRC)
-  # - Utility scenario (Ramsey base-case vs. population-norm adjusted)
-  #
-  # RAMSEY BASE-CASE:
-  # - Uses directly reported Ramsey (2010) utilities: u_PFS = 0.85, u_PD = 0.65
-  # - Source: Ramsey SD, et al. Quality of life in survivors of colorectal
-  #   cancer. Cancer. 2000;88(6):1294-1303.
-  #
-  # POPULATION-NORM ADJUSTED:
-  # - Adjusts Ramsey utilities to country-specific population norms
-  # - Uses EQ-5D population norms from Szende et al. (2014)
-  # - Calculates multipliers to scale mCRC utilities to local baseline
-  # - Preserves relative difference between PFS and PD states
-  # - Rationale: Accounts for cultural differences in utility elicitation
-  #=============================================================================
-
-  cat("\n")
-  cat("Obtaining utilities for scenario: ", utility_scenario, "\n", sep = "")
-
-  utility_result <- get_utility_scenario(
-    country          = country_name,
-    age              = patient_age,
-    utility_scenario = utility_scenario,
-    df_popnorm       = df_popnorm  # Must exist in global environment
-  )
-
-  # Extract utilities from returned list
-  u_F_country <- utility_result$u_PFS  # PFS utility
-  u_P_country <- utility_result$u_PD   # PD utility
-
-  cat("u_PFS (PFS state): ", round(u_F_country, 4), "\n", sep = "")
-  cat("u_PD (PD state):   ", round(u_P_country, 4), "\n", sep = "")
-  cat("Method:            ", utility_result$method, "\n", sep = "")
-
-  #=============================================================================
-  # STEP 3: BUILD COMPLETE PARAMETER LIST
-  #=============================================================================
-  # Construct l_params_all by combining:
-  # 1. Country-specific parameters (from STEP 1)
-  # 2. Scenario-specific utilities (from STEP 2)
-  # 3. Global parameters (defined earlier in main document)
-  #
-  # IMPORTANT: All global parameters must be defined in the environment
-  # before calling this function
-  #=============================================================================
-
-  cat("\n")
-  cat("Building parameter list...\n")
-
-  l_params_all_country <- list(
-    # Hazard ratios (treatment effects on PFS and OS)
-    # -----------------------------------------------
-    HR_FP_Exp = HR_FP_Exp,  # PFS hazard ratio (experimental vs. SoC)
-    HR_FP_SoC = HR_FP_SoC,  # PFS hazard ratio (SoC vs. reference, = 1)
-    HR_PD_Exp = HR_PD_Exp,  # OS hazard ratio (experimental vs. SoC)
-    HR_PD_SoC = HR_PD_SoC,  # OS hazard ratio (SoC vs. reference, = 1)
-    P_OSD_SoC = P_OSD_SoC,  # Probability of death in PD state (SoC)
-    P_OSD_Exp = P_OSD_Exp,  # Probability of death in PD state (Exp)
-
-    # Adverse event probabilities (per cycle)
-    # ----------------------------------------
-    # Standard treatment (SoC) in PFS state:
-    p_FA1_STD = p_FA1_STD,   # AE1 probability - neutropenia
-    p_FA2_STD = p_FA2_STD,   # AE2 probability - diarrhea
-    p_FA3_STD = p_FA3_STD,   # AE3 probability - nausea/vomiting
-    # Experimental treatment (Exp) in PFS state:
-    p_FA1_EXPR = p_FA1_EXPR, # AE1 probability
-    p_FA2_EXPR = p_FA2_EXPR, # AE2 probability
-    p_FA3_EXPR = p_FA3_EXPR, # AE3 probability
-    # FOLFIRI treatment in PD state:
-    p_OSA1_FOLFIRI = p_OSA1_FOLFIRI, # AE1 probability
-    p_OSA2_FOLFIRI = p_OSA2_FOLFIRI, # AE2 probability
-    p_OSA3_FOLFIRI = p_OSA3_FOLFIRI, # AE3 probability
-
-    # Country-specific costs
-    # ----------------------
-    administration_cost = administration_cost_country,
-    c_PFS_Folfox = c_PFS_Folfox_country,
-    c_PFS_Bevacizumab = c_PFS_Bevacizumab_country,
-    c_OS_Folfiri = c_OS_Folfiri_country,
-    subtyping_test_cost = subtyping_test_cost_country,
-    c_AE1 = c_AE1_country,
-    c_AE2 = c_AE2_country,
-    c_AE3 = c_AE3_country,
-    c_D = c_D,  # Death state cost (global, = 0)
-
-    # Scenario-specific utilities
-    # ---------------------------
-    u_F = u_F_country,  # Utility in PFS state
-    u_P = u_P_country,  # Utility in PD state
-    u_D = u_D,          # Utility in death state (= 0)
-
-    # Adverse event disutilities
-    # --------------------------
-    # Percentage reduction in utility when AE occurs
-    AE1_DisUtil = AE1_DisUtil,
-    AE2_DisUtil = AE2_DisUtil,
-    AE3_DisUtil = AE3_DisUtil,
-
-    # Country-specific discount rates (daily)
-    # ---------------------------------------
-    d_e = d_e_country,  # Discount rate for effects (QALYs)
-    d_c = d_c_country,  # Discount rate for costs
-
-    # Model structure parameters
-    # --------------------------
-    n_cycle = n_cycle,  # Number of cycles (143 = ~5.5 years)
-    t_cycle = t_cycle   # Cycle length in days (14 = 2 weeks)
-  )
-
-  #=============================================================================
-  # STEP 4: RUN THE MARKOV MODEL
-  #=============================================================================
-  # Call oncologySemiMarkov() with complete parameter list
-  # This function:
-  # 1. Reconstructs time-dependent transition probabilities from survival curves
-  # 2. Applies hazard ratios to modify probabilities by strategy
-  # 3. Runs the cohort trace through all cycles
-  # 4. Accumulates costs and QALYs with discounting
-  # 5. Calculates incremental metrics and ICER
-  #
-  # Uses survival curve coefficients from global environment
-  # (e.g., coef_weibull_shape_SoC, coef_weibull_scale_SoC)
-  #=============================================================================
-
-  cat("Running oncologySemiMarkov model...\n")
-
-  result <- oncologySemiMarkov(
-    l_params_all = l_params_all_country,
-    n_wtp = n_wtp_country,
-    curve_choice = curve_choice_param
-  )
-
-  cat("Model run completed.\n")
-
-  #=============================================================================
-  # STEP 5: EXTRACT AND STRUCTURE RESULTS
-  #=============================================================================
-  # The oncologySemiMarkov() function returns a list with:
-  # - $Cost: vector of total costs by strategy (SoC, Exp)
-  # - $Effect: vector of total QALYs by strategy (SoC, Exp)
-  # - $ICER: incremental cost-effectiveness ratio
-  # - $NMB: net monetary benefit at specified WTP threshold
-  #
-  # Extract and calculate all key metrics
-  #=============================================================================
-
-  # Extract costs and effects by strategy
-  cost_SoC <- result$Cost[1]   # Total cost for standard of care
-  cost_Exp <- result$Cost[2]   # Total cost for experimental (bevacizumab)
-  qaly_SoC <- result$Effect[1] # Total QALYs for standard of care
-  qaly_Exp <- result$Effect[2] # Total QALYs for experimental
-
-  # Calculate incremental metrics
-  # Incremental cost = Cost_Exp - Cost_SoC
-  # Can be positive (treatment is more expensive) or negative (cost-saving)
-  inc_cost <- cost_Exp - cost_SoC
-
-  # Incremental QALYs = QALY_Exp - QALY_SoC
-  # Expect positive for effective treatment (more QALYs gained)
-  inc_qaly <- qaly_Exp - qaly_SoC
-
-  # Extract ICER from model output
-  # ICER = Incremental cost per QALY gained
-  # If ICER < WTP threshold, treatment is cost-effective
-  # Note: DSAICER is the same for both strategies (it's a ratio), so we take the first value
-  icer_value <- result$DSAICER[1]
-
-  # Calculate Net Monetary Benefit (NMB) = (Inc_QALY × WTP) - Inc_Cost
-  # Positive NMB indicates cost-effective treatment at given WTP
-  nmb_value <- (inc_qaly * n_wtp_country) - inc_cost
-
-  # Print summary
-  cat("\n")
-  cat("RESULTS SUMMARY:\n")
-  cat("----------------\n")
-  cat("Cost (SoC):       €", format(round(cost_SoC, 2), big.mark=","), "\n", sep = "")
-  cat("Cost (Exp):       €", format(round(cost_Exp, 2), big.mark=","), "\n", sep = "")
-  cat("QALYs (SoC):      ", round(qaly_SoC, 4), "\n", sep = "")
-  cat("QALYs (Exp):      ", round(qaly_Exp, 4), "\n", sep = "")
-  cat("Incremental cost: €", format(round(inc_cost, 2), big.mark=","), "\n", sep = "")
-  cat("Incremental QALY: ", round(inc_qaly, 4), "\n", sep = "")
-  cat("ICER:             €", format(round(icer_value, 2), big.mark=","), " per QALY\n", sep = "")
-  cat("NMB:              €", format(round(nmb_value, 2), big.mark=","), "\n", sep = "")
-  cat("========================================================================\n")
-
-  #=============================================================================
-  # STEP 6: RETURN STRUCTURED RESULTS
-  #=============================================================================
-  # Return single-row data frame for easy row-binding across countries
-  #=============================================================================
-
-  return(data.frame(
-    country = country_name,
-    utility_scenario = utility_scenario,
-    u_PFS = u_F_country,
-    u_PD = u_P_country,
-    cost_SoC = cost_SoC,
-    cost_Exp = cost_Exp,
-    qaly_SoC = qaly_SoC,
-    qaly_Exp = qaly_Exp,
-    inc_cost = inc_cost,
-    inc_qaly = inc_qaly,
-    icer = icer_value,
-    nmb = nmb_value,
-    n_wtp = n_wtp_country,
-    stringsAsFactors = FALSE
-  ))
-}
-
-cat("\n")
-cat("Helper function run_country_analysis() defined successfully.\n")
-cat("\n")
+# NOTE: The scenario analysis chunk (added later in this document) will run
+#       BOTH scenarios automatically for comparison and write results to CSV.
+#       This flag only controls which scenario is used for the main model run.
 
 
 #===============================================================================
-# MAIN ANALYSIS: RUN ALL COUNTRIES
-#===============================================================================
-#
-# HEALTH-ECONOMIC RATIONALE:
-# --------------------------
-# This section runs the base-case CEA for all three countries automatically.
-# Previously, users had to manually comment/uncomment country-specific parameter
-# blocks. This automated approach:
-#
-# 1. ELIMINATES MANUAL EDITING: No commenting/uncommenting required
-# 2. ENSURES CONSISTENCY: All countries use identical model structure
-# 3. IMPROVES REPRODUCIBILITY: Results regenerated programmatically
-# 4. FACILITATES COMPARISON: Results automatically combined for easy review
-# 5. REDUCES ERRORS: No risk of running wrong country parameters
-#
-# The base-case analysis remains unchanged for each country. Only country-
-# specific inputs (costs, discount rates, WTP thresholds, population norms)
-# differ across jurisdictions.
-#
-# UTILITY SCENARIO SELECTION:
-# ---------------------------
-# The utility_scenario_main flag controls which utility values are used:
-#
-# - "ramsey_basecase": Ramsey (2010) utilities directly (u_PFS = 0.85, u_PD = 0.65)
-#   This is the PRIMARY base case reported in the manuscript.
-#
-# - "population_norm_adjusted": Adjusts Ramsey utilities to country-specific
-#   population norms using EQ-5D data from Szende et al. (2014)
-#   This is a SCENARIO ANALYSIS to explore cultural differences.
-#
-# NOTE: The scenario analysis chunk at the end of this document will run
-#       BOTH scenarios for all countries regardless of this setting.
-#       This flag only controls which scenario is used for the main model
-#       outputs (plots, tables, detailed sensitivity analyses, etc.).
-#
+# APPLY UTILITY SCENARIO SELECTION
 #===============================================================================
 
-# Set utility scenario for main analysis
-# ---------------------------------------
-# OPTIONS: "ramsey_basecase" or "population_norm_adjusted"
-utility_scenario_main <- "ramsey_basecase"
-
-cat("\n")
-cat("================================================================================\n")
-cat("MAIN COUNTRY ANALYSIS\n")
-cat("================================================================================\n")
-cat("Utility scenario: ", utility_scenario_main, "\n", sep = "")
-cat("This analysis will run the model for Ireland, Germany, and Spain.\n")
-cat("Results will be combined into a single data frame for comparison.\n")
-cat("================================================================================\n")
-
-# Define countries to analyze
-# ---------------------------
-countries_to_analyze <- c("Ireland", "Germany", "Spain")
-
-# Run analysis for all countries
-# -------------------------------
-# Use lapply() to iterate over countries and call run_country_analysis()
-# The function returns a single-row data frame for each country
-main_results_list <- lapply(countries_to_analyze, function(ctry) {
-  run_country_analysis(
-    country_name = ctry,
-    utility_scenario = utility_scenario_main,
-    patient_age = 65,  # Representative age for mCRC patients
-    curve_choice_param = "weibull"  # Use Weibull as base case
-  )
-})
-
-# Combine results into single data frame
-# ---------------------------------------
-# Stack single-row data frames into one multi-row data frame
-main_results_df <- do.call(rbind, main_results_list)
-rownames(main_results_df) <- main_results_df$country
-
-cat("\n")
-cat("================================================================================\n")
-cat("COMBINED RESULTS FOR ALL COUNTRIES\n")
-cat("================================================================================\n")
-print(main_results_df, row.names = FALSE)
-cat("================================================================================\n")
-
-#===============================================================================
-# SAVE MAIN RESULTS TO CSV
-#===============================================================================
-# Write combined results to CSV for easy review and manuscript inclusion
-#===============================================================================
-
-# Create output directory if needed
-if (!dir.exists("output")) {
-  dir.create("output", recursive = TRUE)
-}
-
-# Define output file path
-main_results_file <- paste0("output/Main_Country_Results_",
-                            country_name, "_",
-                            utility_scenario_main, ".csv")
-
-# Write to CSV
-write.csv(main_results_df, file = main_results_file, row.names = FALSE)
-
-cat("\n")
-cat("Main results saved to: ", main_results_file, "\n")
-cat("\n")
-
-#===============================================================================
-# SET VARIABLES FOR DOWNSTREAM ANALYSES (BACKWARD COMPATIBILITY)
-#===============================================================================
+# IMPLEMENTATION LOGIC:
+# ---------------------
+# 1. Call get_utility_scenario() with current country_name and patient age
+# 2. Extract u_PFS and u_PD from the returned list
+# 3. Override u_F and u_P (defined earlier as Ramsey values)
+# 4. Print diagnostic information for transparency
 #
-# IMPORTANT: Many downstream code chunks (OWSA, TWSA, PSA, plots) expect
-# certain variables to be defined in the environment:
-# - country_name, n_wtp
-# - c_PFS_Folfox, c_PFS_Bevacizumab, c_OS_Folfiri, etc.
-# - d_c, d_e
-# - u_F, u_P
-#
-# For backward compatibility with existing code that hasn't been refactored yet,
-# we set these variables to the FIRST country's values (Ireland by default).
-# This allows existing sensitivity analysis chunks to run without modification.
-#
-# FUTURE: Sensitivity analyses should also be wrapped in functions/loops
-#         to run for all countries automatically.
-#
-#===============================================================================
+# RESULT:
+# -------
+# - If utility_scenario = "ramsey_basecase":
+#     u_F and u_P remain unchanged (0.85, 0.65)
+# - If utility_scenario = "population_norm_adjusted":
+#     u_F and u_P are replaced with country/age-adjusted values
 
-cat("Setting environment variables for downstream analyses...\n")
-cat("Using Ireland as default for existing sensitivity analysis chunks.\n")
-cat("(Future refactoring will loop sensitivity analyses over all countries.)\n")
-
-# Set default country for downstream
-default_country_for_downstream <- country_name
-
-# Assign country-specific variables based on default country
-# (Duplicates logic in run_country_analysis for environment variables)
-if (default_country_for_downstream == "Ireland") {
-  country_name <- "Ireland"
-  c_PFS_Folfox <- 157.77
-  c_PFS_Bevacizumab <- 1425.84
-  c_OS_Folfiri <- 167.10
-  administration_cost <- 406.50
-  subtyping_test_cost <- 400
-  c_AE1 <- 3485.23
-  c_AE2 <- 1792.82
-  c_AE3 <- 502.69
-  n_wtp <- 45000
-  country_discount_rate <- 0.04
-} else if (default_country_for_downstream == "Germany") {
-  country_name <- "Germany"
-  c_PFS_Folfox <- ((1406.37 / 30) * 14)
-  c_PFS_Bevacizumab <- ((3252.19 / 30) * 14)
-  c_OS_Folfiri <- ((1442.70 / 30) * 14)
-  administration_cost <- 1927.72
-  subtyping_test_cost <- 400
-  c_AE1 <- 4188.31
-  c_AE2 <- 1982.68
-  c_AE3 <- 1307.72
-  n_wtp <- 78871
-  country_discount_rate <- 0.03
-} else if (default_country_for_downstream == "Spain") {
-  country_name <- "Spain"
-  c_PFS_Folfox <- 323.39
-  c_PFS_Bevacizumab <- 1399.33
-  c_OS_Folfiri <- 147.31
-  administration_cost <- 332.39
-  subtyping_test_cost <- 400
-  c_AE1 <- 5710.97
-  c_AE2 <- 305.55
-  c_AE3 <- 35.11
-  n_wtp <- 30000
-  country_discount_rate <- 0.03
-}
-
-# Convert discount rate to daily and set utilities from scenario
-d_c <- country_discount_rate / 365
-d_e <- country_discount_rate / 365
-
-# Get utilities for the selected scenario and default country
-# This ensures u_F and u_P are set correctly for downstream chunks
+# Define patient age for population norm lookup
+# ----------------------------------------------
 patient_age <- 65
-utility_result <- get_utility_scenario(
-  country = country_name,
-  age = patient_age,
-  utility_scenario = utility_scenario_main,
-  df_popnorm = df_popnorm
-)
-u_F <- utility_result$u_PFS
-u_P <- utility_result$u_PD
+# Typical age for mCRC diagnosis is 60-70 years
+# We use 65 as a representative value for all countries
+# This matches the reference age used for multiplier calculation
 
-cat("Environment variables set for country: ", country_name, "\n")
-cat("u_PFS: ", round(u_F, 4), ", u_PD: ", round(u_P, 4), "\n", sep = "")
-cat("Downstream sensitivity analyses will use these values.\n")
+# Call get_utility_scenario() to obtain utilities for selected scenario
+# ----------------------------------------------------------------------
+utility_result <- get_utility_scenario(
+  country          = country_name,        # Set by active country block ("Ireland", "Germany", or "Spain")
+  age              = patient_age,          # Representative patient age (65)
+  utility_scenario = utility_scenario,     # Scenario flag defined above
+  df_popnorm       = df_popnorm           # Population norm data (loaded earlier)
+)
+# Returns a list with elements:
+#   u_PFS, u_PD (the utilities to use)
+#   method, source (metadata describing the approach)
+#   U_ref, U_pop, mean_PFS_mcrc, mean_PD_mcrc, mult_PFS_mcrc, mult_PD_mcrc (for population_norm_adjusted scenario)
+
+# Override u_F and u_P with scenario-specific values
+# ---------------------------------------------------
+u_F <- utility_result$u_PFS
+# If ramsey_basecase: u_F = 0.85 (unchanged)
+# If population_norm_adjusted: u_F = U_pop_country × mult_PFS_mcrc (country/age-specific)
+
+u_P <- utility_result$u_PD
+# If ramsey_basecase: u_P = 0.65 (unchanged)
+# If population_norm_adjusted: u_P = U_pop_country × mult_PD_mcrc (country/age-specific)
+
+# Print diagnostic information for transparency
+# ----------------------------------------------
+cat("\n")
+cat("====================================================================\n")
+cat("UTILITY SCENARIO APPLIED\n")
+cat("====================================================================\n")
+cat("Scenario:      ", utility_scenario, "\n", sep = "")
+# Prints which scenario is active
+
+cat("Country:       ", country_name, "\n", sep = "")
+# Prints which country is being analyzed
+
+cat("Patient age:   ", patient_age, "\n", sep = "")
+# Prints the age used for population norm lookup
+
+cat("u_PFS (PFS):   ", round(u_F, 4), "\n", sep = "")
+# Prints the PFS utility that will be used in the model (4 decimal places)
+
+cat("u_PD (PD):     ", round(u_P, 4), "\n", sep = "")
+# Prints the PD utility that will be used in the model (4 decimal places)
+
+cat("Method:        ", utility_result$method, "\n", sep = "")
+# Prints description of the method used (e.g., "Ramsey base case (no adjustment)")
+
+cat("Source:        ", utility_result$source, "\n", sep = "")
+# Prints citation/source for the utilities
+
+# If population_norm_adjusted scenario, print additional details
+# ---------------------------------------------------------------
+if (!is.null(utility_result$U_pop) && !is.na(utility_result$U_pop)) {
+  # Check if U_pop exists and is not NA (only present in population_norm_adjusted scenario)
+
+  cat("\nPOPULATION NORM ADJUSTMENT DETAILS:\n")
+  cat("-----------------------------------\n")
+
+  cat("Ref country:   ", utility_result$ref_country, " (age ", utility_result$ref_age, ")\n", sep = "")
+  # Prints reference country used for multiplier calculation (England (UK), age 65)
+
+  cat("U_ref (UK 65): ", round(utility_result$U_ref, 4), "\n", sep = "")
+  # Prints UK population norm at age 65 (denominator for multipliers)
+
+  cat("U_pop (target):", round(utility_result$U_pop, 4), "\n", sep = "")
+  # Prints target country population norm at specified age
+
+  cat("mean_PFS_mcrc: ", round(utility_result$mean_PFS_mcrc, 4), "\n", sep = "")
+  # Prints mean PFS utility from mCRC literature
+
+  cat("mean_PD_mcrc:  ", round(utility_result$mean_PD_mcrc, 4), "\n", sep = "")
+  # Prints mean PD utility from mCRC literature
+
+  cat("mult_PFS_mcrc: ", round(utility_result$mult_PFS_mcrc, 4),
+      " (mCRC PFS utility is ", round(utility_result$mult_PFS_mcrc * 100, 1), "% of UK norm)\n", sep = "")
+  # Prints PFS multiplier and interpretation
+
+  cat("mult_PD_mcrc:  ", round(utility_result$mult_PD_mcrc, 4),
+      " (mCRC PD utility is ", round(utility_result$mult_PD_mcrc * 100, 1), "% of UK norm)\n", sep = "")
+  # Prints PD multiplier and interpretation
+
+  cat("\nCALCULATION:\n")
+  cat("u_PFS = U_pop × mult_PFS_mcrc = ", round(utility_result$U_pop, 4),
+      " × ", round(utility_result$mult_PFS_mcrc, 4),
+      " = ", round(u_F, 4), "\n", sep = "")
+  # Shows the calculation step-by-step for transparency
+
+  cat("u_PD  = U_pop × mult_PD_mcrc  = ", round(utility_result$U_pop, 4),
+      " × ", round(utility_result$mult_PD_mcrc, 4),
+      " = ", round(u_P, 4), "\n", sep = "")
+  # Shows the calculation step-by-step for transparency
+}
+
+cat("====================================================================\n")
 cat("\n")
 
-# Build l_params_all for downstream use
-# This recreates the parameter list for the default country
-# Many downstream chunks reference this variable
+# NOTE: This diagnostic output can be silenced by commenting out the cat() statements
+#       if needed for production runs, but is useful for transparency during development
+#       and for demonstrating to reviewers exactly how utilities were calculated.
+
 l_params_all <- list(
   HR_FP_Exp = HR_FP_Exp,
   HR_FP_SoC = HR_FP_SoC,
   HR_PD_Exp = HR_PD_Exp,
   HR_PD_SoC = HR_PD_SoC,
-  P_OSD_SoC = P_OSD_SoC,
+  P_OSD_SoC = P_OSD_SoC,      
   P_OSD_Exp = P_OSD_Exp,
   p_FA1_STD = p_FA1_STD,
   p_FA2_STD = p_FA2_STD,
@@ -5540,28 +4756,35 @@ l_params_all <- list(
   p_OSA2_FOLFIRI = p_OSA2_FOLFIRI,
   p_OSA3_FOLFIRI = p_OSA3_FOLFIRI,
   administration_cost = administration_cost,
+    #ITS FINE TO INCLUDE THE INGRIDENIENTS THAT MAKE UP c_F_SoC, c_F_Exp, c_P, but don't include c_F_SoC, c_F_Exp, c_P themsleves, BECAUSE WE ARE CHANGING WHAT BUILDS THESE COSTS WITH THE INGRIEDIENTS, SO WE DON'T WANT TO CHANGE IT AGAIN HERE ONCE WE'VE CHANGED WHAT BUILDS IT
   c_PFS_Folfox = c_PFS_Folfox,
   c_PFS_Bevacizumab = c_PFS_Bevacizumab,
   c_OS_Folfiri = c_OS_Folfiri,
   subtyping_test_cost  = subtyping_test_cost,
-  c_D       = c_D,
+  c_D       = c_D,    
   c_AE1 = c_AE1,
   c_AE2 = c_AE2,
   c_AE3 = c_AE3,
-  u_F = u_F,
-  u_P = u_P,
-  u_D = u_D,
+  u_F = u_F,   
+  #ITS FINE TO INCLUDE U_F BUT DON'T INCLUDE U_F_SoC, BECAUSE WE ARE CHANGING WHAT BUILDS U_F_SoC WTH U_F AND AE1_DisUtil SO WE DON'T WANT TO CHANGE IT AGAIN HERE ONCE WE'VE CHANGED WHAT BUILDS IT
+  u_P = u_P,   
+  u_D = u_D,  
   AE1_DisUtil = AE1_DisUtil,
   AE2_DisUtil = AE2_DisUtil,
   AE3_DisUtil = AE3_DisUtil,
-  d_e       = d_e,
+  d_e       = d_e,  
   d_c       = d_c,
   n_cycle   = n_cycle,
   t_cycle   = t_cycle
 )
 
-cat("l_params_all created for downstream use.\n")
-cat("\n")
+ 
+# Test function
+
+# Test whether the function works (and generates the same results)
+# Now passing curve_choice to control which parametric distribution is used
+# This allows the function to switch between Weibull (base case) and gamma (scenario)
+oncologySemiMarkov(l_params_all = l_params_all, n_wtp = n_wtp, curve_choice = curve_choice)
 
 # OK, so I was wondering why the values reported by the PSA/Tornado plot, differed so significantly to the values found with the baseline Markov model.
 # Reviewing the code, I've determined that the reason for these differences is the manner in which the disutility of adverse events is handled in the function in comparison to the baseline analysis in the R Markdown document.
@@ -5608,23 +4831,8 @@ cat("\n")
 
 ```{r}
 # ============================================================================
-# PSA-BASED GAMMA DISTRIBUTION SCENARIO ANALYSIS - COUNTRY-SPECIFIC
+# GAMMA DISTRIBUTION SCENARIO ANALYSIS - IRELAND ONLY
 # ============================================================================
-#
-# This analysis runs for whichever country is active (uncommented) in the
-# country parameter blocks. Results will be labeled with the active country name.
-#
-# **CRITICAL METHODOLOGICAL NOTE - PSA-BASED COMPARISON:**
-# This section implements a PROBABILISTIC sensitivity analysis comparing
-# Weibull and gamma distributions. Both scenarios are evaluated using the
-# SAME PSA framework (n_runs simulations with parameter uncertainty).
-#
-# This ensures:
-#   1. The comparison reflects BOTH parameter AND structural uncertainty
-#   2. Results are reported as PSA means (not single deterministic values)
-#   3. We can quantify uncertainty via 95% credible intervals
-#   4. The comparison is methodologically consistent with the main PSA results
-#   5. Alignment with reviewer request to treat PSA as the "base case"
 #
 # SCENARIO ANALYSIS RATIONALE:
 # This section implements a scenario analysis where we test the impact of
@@ -5642,305 +4850,150 @@ cat("\n")
 # structural uncertainty that may affect decision-making. HTA agencies often
 # request scenario analyses exploring alternative distributions.
 #
-# PSA-BASED IMPLEMENTATION APPROACH:
+# IMPLEMENTATION APPROACH:
 # We will:
-#   1. Run FULL PSA with curve_choice = "weibull" (n_runs simulations)
-#   2. Calculate PSA means and 95% CrIs for Weibull scenario
-#   3. Run FULL PSA with curve_choice = "gamma" (n_runs simulations)
-#   4. Calculate PSA means and 95% CrIs for Gamma scenario
-#   5. Compare PSA-based results (means and CrIs) between distributions
+#   1. Run the model with curve_choice = "weibull" (already done above)
+#   2. Store those results as the "Weibull base case"
+#   3. Run the model again with curve_choice = "gamma"
+#   4. Store those results as the "Gamma scenario"
+#   5. Compare the two sets of results in a table
 #   6. Interpret the sensitivity of our conclusions to distributional choice
 #
-# **WHY PSA-BASED INSTEAD OF DETERMINISTIC?**
-# - Aligns with reviewer feedback to treat PSA as effective base case
-# - Provides credible intervals around the distributional comparison
-# - Ensures internal consistency: main results are PSA-based, so scenario
-#   analysis should be PSA-based too
-# - More transparent about combined parameter + structural uncertainty
-#
-# NOTE: This analysis will run for whichever country is active (uncommented)
-# in the country parameter blocks at the start of the file. The output filename
-# will automatically include the active country name.
+# NOTE: We only run this for Ireland here. The same approach could be applied
+# to Germany and Spain if needed.
 
-# ============================================================================
-# STEP 1: RUN FULL PSA WITH WEIBULL DISTRIBUTION
-# ============================================================================
-#
-# **PSA APPROACH:**
-# We run the model n_runs times (e.g., 10,000 simulations), each time sampling
-# parameter values from their uncertainty distributions. This gives us a
-# distribution of costs and QALYs under Weibull, not just a single point estimate.
-#
-# df_PA_input already contains Weibull parameters sampled for all n_runs iterations
-#
-cat("Running PSA for WEIBULL distribution (", country_name, ")...\n", sep = "")
-cat("Number of simulations:", n_runs, "\n\n")
+# STEP 1: Store Weibull base case results (already calculated above)
+# We'll re-run it explicitly here for clarity and to store the results cleanly
 
-# Create data frames to store PSA results for Weibull scenario
-# These will hold costs and QALYs for each PSA simulation
-df_c_weibull <- df_e_weibull <- data.frame(
-  SoC = rep(NA, n_runs),  # Standard of Care
-  Exp = rep(NA, n_runs)   # Experimental treatment
+# Set curve choice to Weibull (base case)
+curve_choice_weibull <- "weibull"
+
+# Run the model with Weibull distribution
+# This function call uses all the parameters in l_params_all
+# Plus the Weibull coefficients from the environment:
+#   - coef_weibull_shape_SoC, coef_weibull_scale_SoC (for TTP)
+#   - coef_TTD_weibull_shape_SoC, coef_TTD_weibull_scale_SoC (for TTD)
+l_out_weibull <- oncologySemiMarkov(
+  l_params_all = l_params_all,
+  n_wtp        = n_wtp,
+  curve_choice = curve_choice_weibull
 )
 
-# PSA LOOP FOR WEIBULL:
-# For each PSA iteration, run the model with curve_choice = "weibull"
-# Each iteration uses a different row of df_PA_input (different parameter samples)
-for(i_run in 1:n_runs){
-  # Run model with Weibull distribution for this PSA iteration
-  # curve_choice = "weibull" tells the function to use pweibull() for survival
-  l_out_temp <- oncologySemiMarkov(
-    l_params_all = df_PA_input[i_run, ],  # Parameter values for this iteration
-    n_wtp        = n_wtp,                  # Willingness-to-pay threshold
-    curve_choice = "weibull"               # Use Weibull distribution
-  )
+# Extract costs and QALYs for both strategies under Weibull
+# The function returns a data frame with columns: Strategy, Cost, Effect, DSAICER
+# Strategy 1 (row 1) is Standard of Care
+# Strategy 2 (row 2) is Experimental Treatment
+weibull_cost_soc <- l_out_weibull$Cost[1]    # Cost for SoC under Weibull
+weibull_cost_exp <- l_out_weibull$Cost[2]    # Cost for Exp under Weibull
+weibull_qaly_soc <- l_out_weibull$Effect[1]  # QALYs for SoC under Weibull
+weibull_qaly_exp <- l_out_weibull$Effect[2]  # QALYs for Exp under Weibull
 
-  # Store costs and QALYs for this iteration
-  df_c_weibull[i_run, ] <- l_out_temp$Cost    # Costs for SoC and Exp
-  df_e_weibull[i_run, ] <- l_out_temp$Effect  # QALYs for SoC and Exp
+# Calculate incremental cost and QALYs for Weibull scenario
+# Incremental = Experimental minus Standard of Care
+weibull_inc_cost <- weibull_cost_exp - weibull_cost_soc
+weibull_inc_qaly <- weibull_qaly_exp - weibull_qaly_soc
 
-  # Display progress every 10% of simulations
-  if(i_run %% (n_runs/10) == 0) {
-    cat('\r', paste(round(i_run/n_runs * 100, 0), "% done (Weibull PSA)", sep = " "))
-  }
-}
-cat("\n")
+# Calculate ICER for Weibull scenario
+# ICER = Incremental Cost / Incremental QALY
+# This represents the cost per additional QALY gained with experimental treatment
+weibull_icer <- weibull_inc_cost / weibull_inc_qaly
 
-# CALCULATE PSA SUMMARY STATISTICS FOR WEIBULL:
-# For each strategy, calculate mean and 95% credible intervals
-#
-# Mean costs and QALYs (expected values across all PSA simulations)
-weibull_cost_soc_mean <- mean(df_c_weibull$SoC)
-weibull_cost_exp_mean <- mean(df_c_weibull$Exp)
-weibull_qaly_soc_mean <- mean(df_e_weibull$SoC)
-weibull_qaly_exp_mean <- mean(df_e_weibull$Exp)
-
-# Calculate incremental outcomes (mean of differences = difference of means)
-weibull_inc_cost_psa <- weibull_cost_exp_mean - weibull_cost_soc_mean
-weibull_inc_qaly_psa <- weibull_qaly_exp_mean - weibull_qaly_soc_mean
-
-# Calculate ICER from PSA means (not mean of ICERs, which would be misleading)
-weibull_icer_psa <- weibull_inc_cost_psa / weibull_inc_qaly_psa
-
-# Calculate Net Monetary Benefit distribution for Weibull
-weibull_incremental_costs <- df_c_weibull$Exp - df_c_weibull$SoC
-weibull_incremental_qalys <- df_e_weibull$Exp - df_e_weibull$SoC
-weibull_incremental_nmb <- (weibull_incremental_qalys * n_wtp) - weibull_incremental_costs
-
-# Calculate 95% credible intervals for incremental outcomes
-weibull_inc_cost_lower <- quantile(weibull_incremental_costs, probs = 0.025)
-weibull_inc_cost_upper <- quantile(weibull_incremental_costs, probs = 0.975)
-weibull_inc_qaly_lower <- quantile(weibull_incremental_qalys, probs = 0.025)
-weibull_inc_qaly_upper <- quantile(weibull_incremental_qalys, probs = 0.975)
-weibull_inc_nmb_mean <- mean(weibull_incremental_nmb)
-weibull_inc_nmb_lower <- quantile(weibull_incremental_nmb, probs = 0.025)
-weibull_inc_nmb_upper <- quantile(weibull_incremental_nmb, probs = 0.975)
-
-# Display Weibull PSA results
-cat("\n=======================================================\n")
-cat("WEIBULL PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
-cat("=======================================================\n")
-cat("Number of simulations:", n_runs, "\n\n")
-cat("Mean Costs:\n")
-cat("  SoC: €", round(weibull_cost_soc_mean, 2), "\n")
-cat("  Exp: €", round(weibull_cost_exp_mean, 2), "\n\n")
-cat("Mean QALYs:\n")
-cat("  SoC:", round(weibull_qaly_soc_mean, 4), "\n")
-cat("  Exp:", round(weibull_qaly_exp_mean, 4), "\n\n")
-cat("Incremental Cost (Mean): €", round(weibull_inc_cost_psa, 2),
-    " [95% CrI: €", round(weibull_inc_cost_lower, 2), " to €", round(weibull_inc_cost_upper, 2), "]\n")
-cat("Incremental QALYs (Mean):", round(weibull_inc_qaly_psa, 4),
-    " [95% CrI:", round(weibull_inc_qaly_lower, 4), "to", round(weibull_inc_qaly_upper, 4), "]\n")
-cat("ICER (from PSA means): €", round(weibull_icer_psa, 2), " per QALY\n")
-cat("Incremental NMB (Mean): €", round(weibull_inc_nmb_mean, 2),
-    " [95% CrI: €", round(weibull_inc_nmb_lower, 2), " to €", round(weibull_inc_nmb_upper, 2), "]\n")
-cat("=======================================================\n\n")
+# Display Weibull results for verification
+cat("WEIBULL BASE CASE RESULTS (Ireland):\n")
+cat("SoC Cost: €", round(weibull_cost_soc, 2), "\n")
+cat("Exp Cost: €", round(weibull_cost_exp, 2), "\n")
+cat("SoC QALYs:", round(weibull_qaly_soc, 4), "\n")
+cat("Exp QALYs:", round(weibull_qaly_exp, 4), "\n")
+cat("Incremental Cost: €", round(weibull_inc_cost, 2), "\n")
+cat("Incremental QALYs:", round(weibull_inc_qaly, 4), "\n")
+cat("ICER: €", round(weibull_icer, 2), " per QALY\n\n")
 
 
-# ============================================================================
-# STEP 2: RUN FULL PSA WITH GAMMA DISTRIBUTION
-# ============================================================================
-#
-# **PSA APPROACH:**
-# Now we run the SAME PSA (same n_runs, same parameter samples from df_PA_input),
-# but with curve_choice = "gamma" instead of "weibull".
-#
-# This ensures the comparison isolates STRUCTURAL uncertainty (Weibull vs Gamma)
-# while keeping PARAMETER uncertainty constant across both scenarios.
-#
-cat("Running PSA for GAMMA distribution (", country_name, ")...\n", sep = "")
-cat("Number of simulations:", n_runs, "\n\n")
+# STEP 2: Run Gamma scenario
+# Now we'll run the same model but with gamma distribution for survival
 
-# Create data frames to store PSA results for Gamma scenario
-df_c_gamma <- df_e_gamma <- data.frame(
-  SoC = rep(NA, n_runs),  # Standard of Care
-  Exp = rep(NA, n_runs)   # Experimental treatment
+# Set curve choice to gamma (scenario analysis)
+curve_choice_gamma <- "gamma"
+
+# Run the model with gamma distribution
+# This function call uses all the same parameters in l_params_all
+# But now uses gamma coefficients from the environment:
+#   - coef_gamma_shape_SoC, coef_gamma_rate_SoC (for TTP)
+#   - coef_TTD_gamma_shape_SoC, coef_TTD_gamma_rate_SoC (for TTD)
+# The function's internal logic switches from pweibull() to pgamma()
+# based on the curve_choice parameter
+l_out_gamma <- oncologySemiMarkov(
+  l_params_all = l_params_all,
+  n_wtp        = n_wtp,
+  curve_choice = curve_choice_gamma
 )
 
-# PSA LOOP FOR GAMMA:
-# For each PSA iteration, run the model with curve_choice = "gamma"
-# Use the SAME parameter samples (same row of df_PA_input) as Weibull
-# This ensures fair comparison (only distribution changes, not parameters)
-for(i_run in 1:n_runs){
-  # Run model with Gamma distribution for this PSA iteration
-  # curve_choice = "gamma" tells the function to use pgamma() for survival
-  l_out_temp <- oncologySemiMarkov(
-    l_params_all = df_PA_input[i_run, ],  # Same parameters as Weibull iteration
-    n_wtp        = n_wtp,                  # Same WTP threshold
-    curve_choice = "gamma"                 # Use Gamma distribution
-  )
+# Extract costs and QALYs for both strategies under gamma
+# Same structure as Weibull results above
+gamma_cost_soc <- l_out_gamma$Cost[1]    # Cost for SoC under gamma
+gamma_cost_exp <- l_out_gamma$Cost[2]    # Cost for Exp under gamma
+gamma_qaly_soc <- l_out_gamma$Effect[1]  # QALYs for SoC under gamma
+gamma_qaly_exp <- l_out_gamma$Effect[2]  # QALYs for Exp under gamma
 
-  # Store costs and QALYs for this iteration
-  df_c_gamma[i_run, ] <- l_out_temp$Cost    # Costs for SoC and Exp
-  df_e_gamma[i_run, ] <- l_out_temp$Effect  # QALYs for SoC and Exp
+# Calculate incremental cost and QALYs for gamma scenario
+gamma_inc_cost <- gamma_cost_exp - gamma_cost_soc
+gamma_inc_qaly <- gamma_qaly_exp - gamma_qaly_soc
 
-  # Display progress every 10% of simulations
-  if(i_run %% (n_runs/10) == 0) {
-    cat('\r', paste(round(i_run/n_runs * 100, 0), "% done (Gamma PSA)", sep = " "))
-  }
-}
-cat("\n")
+# Calculate ICER for gamma scenario
+gamma_icer <- gamma_inc_cost / gamma_inc_qaly
 
-# CALCULATE PSA SUMMARY STATISTICS FOR GAMMA:
-#
-# Mean costs and QALYs (expected values across all PSA simulations)
-gamma_cost_soc_mean <- mean(df_c_gamma$SoC)
-gamma_cost_exp_mean <- mean(df_c_gamma$Exp)
-gamma_qaly_soc_mean <- mean(df_e_gamma$SoC)
-gamma_qaly_exp_mean <- mean(df_e_gamma$Exp)
-
-# Calculate incremental outcomes
-gamma_inc_cost_psa <- gamma_cost_exp_mean - gamma_cost_soc_mean
-gamma_inc_qaly_psa <- gamma_qaly_exp_mean - gamma_qaly_soc_mean
-
-# Calculate ICER from PSA means
-gamma_icer_psa <- gamma_inc_cost_psa / gamma_inc_qaly_psa
-
-# Calculate Net Monetary Benefit distribution for Gamma
-gamma_incremental_costs <- df_c_gamma$Exp - df_c_gamma$SoC
-gamma_incremental_qalys <- df_e_gamma$Exp - df_e_gamma$SoC
-gamma_incremental_nmb <- (gamma_incremental_qalys * n_wtp) - gamma_incremental_costs
-
-# Calculate 95% credible intervals for incremental outcomes
-gamma_inc_cost_lower <- quantile(gamma_incremental_costs, probs = 0.025)
-gamma_inc_cost_upper <- quantile(gamma_incremental_costs, probs = 0.975)
-gamma_inc_qaly_lower <- quantile(gamma_incremental_qalys, probs = 0.025)
-gamma_inc_qaly_upper <- quantile(gamma_incremental_qalys, probs = 0.975)
-gamma_inc_nmb_mean <- mean(gamma_incremental_nmb)
-gamma_inc_nmb_lower <- quantile(gamma_incremental_nmb, probs = 0.025)
-gamma_inc_nmb_upper <- quantile(gamma_incremental_nmb, probs = 0.975)
-
-# Display Gamma PSA results
-cat("\n=======================================================\n")
-cat("GAMMA PSA RESULTS (", country_name, ") - PSA-BASED\n", sep = "")
-cat("=======================================================\n")
-cat("Number of simulations:", n_runs, "\n\n")
-cat("Mean Costs:\n")
-cat("  SoC: €", round(gamma_cost_soc_mean, 2), "\n")
-cat("  Exp: €", round(gamma_cost_exp_mean, 2), "\n\n")
-cat("Mean QALYs:\n")
-cat("  SoC:", round(gamma_qaly_soc_mean, 4), "\n")
-cat("  Exp:", round(gamma_qaly_exp_mean, 4), "\n\n")
-cat("Incremental Cost (Mean): €", round(gamma_inc_cost_psa, 2),
-    " [95% CrI: €", round(gamma_inc_cost_lower, 2), " to €", round(gamma_inc_cost_upper, 2), "]\n")
-cat("Incremental QALYs (Mean):", round(gamma_inc_qaly_psa, 4),
-    " [95% CrI:", round(gamma_inc_qaly_lower, 4), "to", round(gamma_inc_qaly_upper, 4), "]\n")
-cat("ICER (from PSA means): €", round(gamma_icer_psa, 2), " per QALY\n")
-cat("Incremental NMB (Mean): €", round(gamma_inc_nmb_mean, 2),
-    " [95% CrI: €", round(gamma_inc_nmb_lower, 2), " to €", round(gamma_inc_nmb_upper, 2), "]\n")
-cat("=======================================================\n\n")
+# Display gamma results for verification
+cat("GAMMA SCENARIO RESULTS (Ireland):\n")
+cat("SoC Cost: €", round(gamma_cost_soc, 2), "\n")
+cat("Exp Cost: €", round(gamma_cost_exp, 2), "\n")
+cat("SoC QALYs:", round(gamma_qaly_soc, 4), "\n")
+cat("Exp QALYs:", round(gamma_qaly_exp, 4), "\n")
+cat("Incremental Cost: €", round(gamma_inc_cost, 2), "\n")
+cat("Incremental QALYs:", round(gamma_inc_qaly, 4), "\n")
+cat("ICER: €", round(gamma_icer, 2), " per QALY\n\n")
 
 
-# ============================================================================
-# STEP 3: CREATE PSA-BASED COMPARISON TABLE
-# ============================================================================
-#
-# **PSA-BASED COMPARISON TABLE:**
-# This table reports PSA means and 95% credible intervals for both distributions.
-# All values are derived from the PSA results (not deterministic single-run values).
-#
-# This table is suitable for inclusion in the manuscript as it shows:
-#   1. Mean costs and QALYs for each strategy under each distribution
-#   2. Incremental costs and QALYs (with 95% CrIs)
-#   3. ICERs calculated from PSA means
-#   4. Incremental NMB (with 95% CrIs)
-#
-cat("Creating PSA-based Weibull vs Gamma comparison table...\n")
+# STEP 3: Create comparison table
+# Build a comprehensive table comparing Weibull and gamma scenarios
 
-# Create comprehensive comparison table with PSA-based results
-# This table has one row per distribution, showing all summary statistics
-psa_comparison_table <- data.frame(
-  Distribution = c("Weibull", "Gamma"),
-
-  # Mean costs for each strategy
-  SoC_Cost_Mean = c(weibull_cost_soc_mean, gamma_cost_soc_mean),
-  Exp_Cost_Mean = c(weibull_cost_exp_mean, gamma_cost_exp_mean),
-
-  # Mean QALYs for each strategy
-  SoC_QALY_Mean = c(weibull_qaly_soc_mean, gamma_qaly_soc_mean),
-  Exp_QALY_Mean = c(weibull_qaly_exp_mean, gamma_qaly_exp_mean),
-
-  # Incremental outcomes (means)
-  Inc_Cost_Mean = c(weibull_inc_cost_psa, gamma_inc_cost_psa),
-  Inc_QALY_Mean = c(weibull_inc_qaly_psa, gamma_inc_qaly_psa),
-
-  # ICER from PSA means
-  ICER_PSA = c(weibull_icer_psa, gamma_icer_psa),
-
-  # Incremental NMB (mean)
-  Inc_NMB_Mean = c(weibull_inc_nmb_mean, gamma_inc_nmb_mean),
-
-  # 95% Credible intervals for incremental cost
-  Inc_Cost_Lower_CrI = c(weibull_inc_cost_lower, gamma_inc_cost_lower),
-  Inc_Cost_Upper_CrI = c(weibull_inc_cost_upper, gamma_inc_cost_upper),
-
-  # 95% Credible intervals for incremental QALYs
-  Inc_QALY_Lower_CrI = c(weibull_inc_qaly_lower, gamma_inc_qaly_lower),
-  Inc_QALY_Upper_CrI = c(weibull_inc_qaly_upper, gamma_inc_qaly_upper),
-
-  # 95% Credible intervals for incremental NMB
-  Inc_NMB_Lower_CrI = c(weibull_inc_nmb_lower, gamma_inc_nmb_lower),
-  Inc_NMB_Upper_CrI = c(weibull_inc_nmb_upper, gamma_inc_nmb_upper),
-
-  stringsAsFactors = FALSE
+# Create data frame with comparison results
+# Each row represents one scenario-strategy combination
+comparison_table <- data.frame(
+  Distribution = c("Weibull", "Weibull", "Gamma", "Gamma"),
+  Strategy = c("Standard of Care", "Experimental", "Standard of Care", "Experimental"),
+  Cost = c(weibull_cost_soc, weibull_cost_exp, gamma_cost_soc, gamma_cost_exp),
+  QALY = c(weibull_qaly_soc, weibull_qaly_exp, gamma_qaly_soc, gamma_qaly_exp),
+  Inc_Cost = c(NA, weibull_inc_cost, NA, gamma_inc_cost),
+  Inc_QALY = c(NA, weibull_inc_qaly, NA, gamma_inc_qaly),
+  ICER = c(NA, weibull_icer, NA, gamma_icer)
 )
 
-# Display the PSA-based comparison table
-cat("\n=======================================================\n")
-cat("WEIBULL VS. GAMMA COMPARISON TABLE (PSA-BASED)\n")
-cat("=======================================================\n")
-print(psa_comparison_table, row.names = FALSE)
-cat("=======================================================\n\n")
+# Display the comparison table
+print("WEIBULL VS. GAMMA COMPARISON TABLE (Ireland):")
+print(comparison_table)
 
-# Save PSA-based comparison table to CSV for use in paper
-# Filename dynamically includes country name from active country block
-comparison_filename <- paste0("Weibull_vs_Gamma_", country_name, "_PSA.csv")
+# Save comparison table to CSV for use in paper
+# Write comparison table to CSV file
 write.csv(
-  psa_comparison_table,
-  file = file.path("output", comparison_filename),
+  comparison_table,
+  file = file.path("output", "Weibull_vs_Gamma_Ireland.csv"),
   row.names = FALSE
 )
 
-cat("PSA-based comparison table saved to: output/", comparison_filename, "\n\n", sep = "")
+cat("\nComparison table saved to: output/Weibull_vs_Gamma_Ireland.csv\n")
 
+# Calculate the difference in ICER between distributions
+# This quantifies the structural uncertainty
+icer_difference <- gamma_icer - weibull_icer
+icer_percent_change <- (gamma_icer - weibull_icer) / weibull_icer * 100
 
-# ============================================================================
-# STEP 4: INTERPRET PSA-BASED COMPARISON
-# ============================================================================
-#
-# **INTERPRETATION OF PSA-BASED RESULTS:**
-# Compare ICERs calculated from PSA means to assess structural uncertainty
-#
-icer_difference_psa <- gamma_icer_psa - weibull_icer_psa
-icer_percent_change_psa <- (gamma_icer_psa - weibull_icer_psa) / weibull_icer_psa * 100
-
-cat("=======================================================\n")
-cat("INTERPRETATION OF PSA-BASED RESULTS:\n")
-cat("=======================================================\n")
-cat("ICER under Weibull (PSA): €", round(weibull_icer_psa, 2), " per QALY\n")
-cat("ICER under Gamma (PSA):   €", round(gamma_icer_psa, 2), " per QALY\n")
-cat("Absolute difference:      €", round(icer_difference_psa, 2), " per QALY\n")
-cat("Relative change:          ", round(icer_percent_change_psa, 2), "%\n\n")
+cat("\n")
+cat("INTERPRETATION OF RESULTS:\n")
+cat("==========================\n")
+cat("ICER under Weibull:  €", round(weibull_icer, 2), " per QALY\n")
+cat("ICER under Gamma:    €", round(gamma_icer, 2), " per QALY\n")
+cat("Absolute difference: €", round(icer_difference, 2), " per QALY\n")
+cat("Relative change:     ", round(icer_percent_change, 2), "%\n\n")
 
 # Interpret the sensitivity based on the magnitude of change
 # HEALTH ECONOMIC INTERPRETATION:
@@ -5952,13 +5005,13 @@ cat("Relative change:          ", round(icer_percent_change_psa, 2), "%\n\n")
 # to see if the cost-effectiveness conclusion changes
 wtp_ireland <- 45000
 
-# Check if cost-effectiveness conclusion changes (using PSA-based ICERs)
-weibull_cost_effective_psa <- weibull_icer_psa <= wtp_ireland
-gamma_cost_effective_psa <- gamma_icer_psa <= wtp_ireland
+# Check if cost-effectiveness conclusion changes
+weibull_cost_effective <- weibull_icer <= wtp_ireland
+gamma_cost_effective <- gamma_icer <= wtp_ireland
 
-if (weibull_cost_effective_psa == gamma_cost_effective_psa) {
+if (weibull_cost_effective == gamma_cost_effective) {
   cat("COST-EFFECTIVENESS CONCLUSION: CONSISTENT\n")
-  if (weibull_cost_effective_psa) {
+  if (weibull_cost_effective) {
     cat("The intervention is cost-effective under BOTH distributions\n")
     cat("(ICER < €", wtp_ireland, "/QALY in both scenarios)\n\n")
   } else {
@@ -5973,12 +5026,12 @@ if (weibull_cost_effective_psa == gamma_cost_effective_psa) {
   cat("         in decision-making.\n\n")
 }
 
-# Provide interpretation guidance (using PSA-based percent change)
-if (abs(icer_percent_change_psa) < 10) {
+# Provide interpretation guidance
+if (abs(icer_percent_change) < 10) {
   cat("STRUCTURAL UNCERTAINTY: LOW\n")
   cat("The ICER changes by less than 10%, indicating that results are\n")
   cat("robust to the choice between Weibull and gamma distributions.\n")
-} else if (abs(icer_percent_change_psa) < 25) {
+} else if (abs(icer_percent_change) < 25) {
   cat("STRUCTURAL UNCERTAINTY: MODERATE\n")
   cat("The ICER changes by 10-25%, indicating some structural uncertainty.\n")
   cat("The cost-effectiveness conclusion is likely stable, but the magnitude\n")
@@ -5999,39 +5052,8 @@ if (abs(icer_percent_change_psa) < 10) {
 #   4. Consulting clinical experts on plausibility of long-term extrapolations
 #   5. Reporting a range of ICERs across plausible distributions
 
-# ============================================================================
-# METHODOLOGICAL NOTE: PSA-BASED RESULTS ARE THE REPORTED BASE CASE
-# ============================================================================
-#
-# **CRITICAL CLARIFICATION FOR MANUSCRIPT:**
-#
-# All results reported in this analysis are PSA-BASED, not deterministic.
-# This includes:
-#   - The "base case" Weibull results: derived from PSA means, not single run
-#   - The gamma scenario results: derived from PSA means, not single run
-#   - All ICERs: calculated from PSA means (ΔCost_mean / ΔQALY_mean)
-#   - All 95% CrIs: derived from PSA distributions
-#
-# This approach:
-#   1. Aligns with reviewer feedback to treat PSA as the effective base case
-#   2. Ensures internal consistency (all reported values reflect uncertainty)
-#   3. Provides more transparent reporting of parameter uncertainty
-#   4. Makes Weibull vs Gamma comparison methodologically rigorous
-#
-# For the paper:
-#   - Table of base-case results → use PSA means from df_out_ce_PA
-#   - Weibull vs Gamma comparison → use psa_comparison_table (saved to CSV)
-#   - All reported ICERs → calculated from PSA means
-#   - All uncertainty bounds → 95% CrIs from PSA distributions
-#
-cat("\n=======================================================\n")
-cat("PSA-BASED GAMMA SCENARIO ANALYSIS COMPLETE\n")
-cat("=======================================================\n")
-cat("All results are PSA-based (means from", n_runs, "simulations)\n")
-cat("Comparison table saved to: output/", comparison_filename, "\n", sep = "")
-cat("=======================================================\n\n")
-
 ```
+
 
 ```{r}
 
@@ -6687,7 +5709,7 @@ DSAICER
 tornado_plot <- owsa_tornado(
   owsa = DSAICER,      # OWSA results containing all parameter variations
   txtsize = 11,         # Text size for parameter labels
-  ylim = c(100000, 350000)  # ICER range to display (€100k to €400k)
+  ylim = c(100000, 400000)  # ICER range to display (€100k to €400k)
 )
 
 # NOTE: Alternative approach (commented out below)
@@ -7398,21 +6420,18 @@ DSAICER_top10 <- DSAICER %>%
 
   # Keep only rows where the parameter column matches one of our top 10
   # The %in% operator returns TRUE if parameter is in top10_parameters vector
-  # This will keep all 200 rows per parameter (100 samples × 2 strategies)
+  # This will keep all 100 samples for each of the 10 parameters
   # Health economic interpretation: Retaining full detail for influential parameters
   # Modeling interpretation: Subsetting the data frame for focused visualization
   filter(parameter %in% top10_parameters)
 
 # Verify we have the expected number of rows
-# With 10 parameters, 100 samples each (nsamp=100), and 2 strategies, we expect 2000 rows
-# Note: run_owsa_det() returns rows for BOTH strategies (Folfox and Bevacizumab)
-# Even though ICER is the same ratio for both, dampack stores it per-strategy
-# The run_owsa_det() function from dampack returns data for both strategies (Folfox and Bevacizumab), even though the ICER value is the same for both (since ICER is a ratio comparing the two).
+# With 10 parameters and 100 samples each (nsamp=100), we expect 1000 rows
 # This is a data quality check to ensure our filtering worked correctly
 # Health economic value: Ensuring data integrity before visualization
 # Modeling value: Catching any potential errors in the filtering process
 print(paste("Number of rows in DSAICER_top10:", nrow(DSAICER_top10)))
-print(paste("Expected rows: 10 parameters × 100 samples × 2 strategies = 2000"))
+print(paste("Expected rows: 10 parameters × 100 samples = 1000"))
 
 # If the numbers don't match, something went wrong in our filtering
 # This could indicate:
@@ -7421,71 +6440,86 @@ print(paste("Expected rows: 10 parameters × 100 samples × 2 strategies = 2000"
 # - Some other data processing error
 
 # ============================================================================
-# STEP 4: SET FIXED AXIS LIMITS FOR CONSISTENT TORNADO PLOT COMPARISON
+# STEP 4: DETERMINE SENSIBLE AXIS LIMITS FOR THE TORNADO PLOT
 # ============================================================================
 #
-# HEALTH ECONOMIC RATIONALE FOR FIXED AXIS LIMITS:
+# HEALTH ECONOMIC RATIONALE FOR CUSTOM AXIS LIMITS:
 # -----------------------------------------------------------------------------
-# For multi-country comparative analysis, using consistent axis scales across
-# all tornado plots is critical for valid visual comparison. Fixed limits allow:
+# Appropriate axis scaling is critical for accurate interpretation of
+# sensitivity analysis results. Poorly chosen limits can:
 #
-# COMPARABILITY: Identical axis scales enable direct visual comparison across
-#                countries and analyses
-# CONTEXT: A fixed €200k-€400k range provides appropriate policy context since
-#          it spans well beyond all three countries' WTP thresholds
-# FOCUS: Constraining the range to policy-relevant ICERs improves readability
-# STANDARDIZATION: Consistent scaling is a best practice for comparative CEA
+# MISLEAD: Too narrow limits exaggerate small differences
+# OBSCURE: Too wide limits make real differences appear trivial
+# DISTORT: Asymmetric limits can create false impressions of direction
 #
-# In health economic reporting, when comparing across countries or scenarios,
-# we must ensure that:
-# - Visual comparisons are valid (same scales)
-# - The range encompasses the decision-relevant ICER values
-# - The magnitude of parameter influence can be compared across analyses
-# - The chosen range is justified and transparent
+# In health economic reporting, we must ensure that:
+# - The magnitude of parameter influence is accurately represented
+# - Readers can make valid comparisons between parameters
+# - The plot is not manipulated (intentionally or not) to support a conclusion
+# - There's enough context (white space) to see the data clearly
 #
-# FIXED RANGE APPROACH:
+# BEST PRACTICE APPROACH:
 # -----------------------------------------------------------------------------
-# We set axis limits to a fixed €100k-€400k range for all tornado plots:
+# We calculate axis limits based on the ACTUAL data range for our top 10
+# parameters, then add a small buffer for visual clarity:
 #
-# 1. Lower bound: €100,000 per QALY
-# 2. Upper bound: €400,000 per QALY
-# 3. Range spans all country WTP thresholds (Ireland: €45k, Germany: €78.9k, Spain: €30k)
-# 4. Focuses on clinically and policy-relevant ICER values
+# 1. Find the minimum ICER value across all top 10 parameters
+# 2. Find the maximum ICER value across all top 10 parameters
+# 3. Calculate the range = max - min
+# 4. Add 5% buffer on each side (standard practice in data visualization)
 #
 # This ensures:
-# - Direct visual comparability across all analyses
-# - Policy-relevant context for decision-makers
-# - Consistent presentation standards
-# - Transparent and reproducible approach
+# - All data points are visible (no truncation)
+# - Differences are accurately portrayed (no distortion)
+# - The plot is readable (bars don't touch axis edges)
+# - The approach is defensible and reproducible
 #
 # MODELING APPROACH:
 # -----------------------------------------------------------------------------
-# We set ylim_top10 to a fixed vector c(100000, 400000) rather than
-# calculating data-driven limits.
+# We use R's min() and max() functions on the outcome_val column of our
+# filtered dataset, then apply simple arithmetic to calculate buffered limits.
 
-# Set fixed axis limits for consistent ICER range visualization
-# We're constraining the visualization to show ICERs within the €100k-€400k range
-# This provides a standardized comparison scale across all tornado plots
-# Health economic interpretation: We're establishing a consistent scale that:
-# 1. Spans well beyond the WTP thresholds for all three countries analyzed:
-#    - Ireland: €45,000
-#    - Germany: €78,871
-#    - Spain: €30,000
-# 2. Focuses on the clinically and policy-relevant ICER range
-# 3. Enables direct visual comparison across different analyses
-# Modeling interpretation: Setting explicit ylim bounds for owsa_tornado
+# Calculate the minimum ICER value in the top 10 parameter subset
+# This is the lowest ICER achieved by any parameter at any point in its range
+# Health economic interpretation: The most optimistic ICER under parameter uncertainty
+# Modeling interpretation: The left edge of our tornado plot data
+min_icer_top10 <- min(DSAICER_top10$outcome_val)
+
+# Calculate the maximum ICER value in the top 10 parameter subset
+# This is the highest ICER achieved by any parameter at any point in its range
+# Health economic interpretation: The most pessimistic ICER under parameter uncertainty
+# Modeling interpretation: The right edge of our tornado plot data
+max_icer_top10 <- max(DSAICER_top10$outcome_val)
+
+# Calculate the 5% buffer amount
+# Buffer = 5% of the total range
+# This provides breathing room so bars don't touch the axis edges
+# 5% is a standard convention in data visualization - small enough not to distort,
+# large enough to provide visual clarity
+# Health economic interpretation: Maintaining visual honesty in reporting
+# Modeling interpretation: Improving plot aesthetics without changing the message
+buffer <- 0.05 * (max_icer_top10 - min_icer_top10)
+
+# Create the axis limits by subtracting buffer from min and adding to max
+# This creates a two-element vector: c(lower_limit, upper_limit)
+# The c() function combines values into a vector
+# Health economic interpretation: Setting fair, data-driven axis bounds
+# Modeling interpretation: Defining the ylim parameter for owsa_tornado
 # Note: "ylim" is the parameter name in owsa_tornado, but due to horizontal
 # orientation, this actually controls the ICER axis (which appears horizontal/x)
-ylim_top10 <- c(100000, 350000)
+ylim_top10 <- c(min_icer_top10 - buffer, max_icer_top10 + buffer)
 
-# Display the fixed limits being used
+# Display the calculated limits for review
 # This transparency is important for reproducibility and validation
+# Reviewers or users can verify that our axis choices are appropriate
 # Health economic value: Transparent reporting of visualization decisions
-# Practical value: Ensures consistency across all tornado plot outputs
-print(paste("Fixed ICER axis limits:", ylim_top10[1], "to", ylim_top10[2]))
+# Practical value: Helps identify if limits look unreasonable (e.g., negative ICER)
+print(paste("ICER range for top 10:", round(min_icer_top10), "to", round(max_icer_top10)))
+print(paste("Axis limits with 5% buffer:", round(ylim_top10[1]), "to", round(ylim_top10[2])))
 
-# Expected output:
-# "Fixed ICER axis limits: 100000 to 400000"
+# Example output might be:
+# "ICER range for top 10: 125000 to 215000"
+# "Axis limits with 5% buffer: 120500 to 219500"
 
 # ============================================================================
 # STEP 5: CREATE TORNADO PLOT FOR TOP 10 PARAMETERS
@@ -7521,7 +6555,7 @@ print(paste("Fixed ICER axis limits:", ylim_top10[1], "to", ylim_top10[2]))
 # FUNCTION PARAMETERS WE'RE USING:
 # - owsa: The OWSA results data frame (we use our top 10 subset)
 # - txtsize: Base text size for labels (11 pt is readable)
-# - ylim: Axis limits (fixed at €100k-€400k for cross-country comparability)
+# - ylim: Axis limits (our calculated limits with 5% buffer)
 #
 # Note on axis naming: Due to horizontal orientation, "ylim" in the function
 # actually controls the ICER axis (which displays horizontally).
@@ -7550,10 +6584,10 @@ tornado_plot_top10 <- owsa_tornado(
   # Practical consideration: Must balance readability with space constraints
   txtsize = 11,
 
-  # Apply our fixed axis limits (€100k-€400k for cross-country comparability)
-  # This ensures consistent scaling across all country analyses
+  # Apply our calculated axis limits (with 5% buffer)
+  # This ensures appropriate scaling without excessive white space
   # ylim is a two-element vector: c(minimum, maximum)
-  # Health economic interpretation: Standardized bounds for valid comparison
+  # Health economic interpretation: Fair, data-driven axis bounds
   # Modeling interpretation: Controlling the range of the ICER axis
   # Important: In owsa_tornado's horizontal layout, ylim controls the outcome (ICER)
   # axis, even though it appears horizontally on the page
@@ -7875,89 +6909,84 @@ print(paste("Top 10 tornado plot saved successfully as:", filename_top10))
 # - Filename: output/tornado_top10_<country>.png (e.g., output/tornado_top10_ireland.png)
 
 # ============================================================================
-# STEP 9: CREATE SECOND TORNADO PLOT VERSION (KEPT FOR CONSISTENCY)
+# STEP 9: CREATE VERSION WITHOUT AXIS LIMITS (FOR COMPARISON)
 # ============================================================================
 #
-# HEALTH ECONOMIC NOTE ON DUPLICATE VERSIONS:
+# HEALTH ECONOMIC RATIONALE FOR CREATING AN "UNLIMITED" VERSION:
 # -----------------------------------------------------------------------------
-# This section creates a second tornado plot with the same specifications as
-# the primary plot. Originally, this "unlimited" version was created to show
-# the full data range without custom axis limits for comparison purposes.
+# In data visualization, axis limits can significantly affect interpretation.
+# While we've calculated sensible limits based on the data, it's good practice
+# to also create a version without custom limits to ensure we haven't:
 #
-# CURRENT APPROACH (UPDATED):
-# -----------------------------------------------------------------------------
-# We now use fixed axis limits (€200k-€400k) for ALL tornado plots to ensure:
-# - Consistent visual scaling across countries and analyses
-# - Valid direct comparison between different tornado plots
-# - Policy-relevant ICER range that spans all country WTP thresholds
+# 1. HIDDEN IMPORTANT CONTEXT: Custom limits might crop out relevant range
+# 2. DISTORTED COMPARISONS: Limited axes might exaggerate or minimize differences
+# 3. INTRODUCED BIAS: Axis choices could (even unintentionally) favor a conclusion
 #
-# Both the primary tornado plot and this "unlimited" version now use the same
-# fixed limits (ylim_top10). This section is kept for:
-# - Backward compatibility with existing workflow
-# - Flexibility to create alternative versions if needed in future
-# - Documentation of previous visualization approach
+# By creating both versions, we:
+# - Can visually compare them to verify our limits are appropriate
+# - Provide transparency in our visualization choices
+# - Have both options available for different presentation contexts
+# - Follow best practices in data visualization ethics
 #
-# PRACTICAL USE:
-# - Both versions are now identical in terms of axis scaling
-# - Users can modify either version independently if alternative presentations
-#   are needed for specific audiences
+# PRACTICAL USE CASES:
+# - LIMITED VERSION: Use in publications where space is constrained and you want
+#   to focus reader attention on the relevant range
+# - UNLIMITED VERSION: Use in appendices, technical reports, or when reviewers
+#   request to see the full range
 #
 # MODELING APPROACH:
 # -----------------------------------------------------------------------------
-# We create a second tornado plot identical to the first, including the same
-# fixed axis limits (ylim_top10).
+# We create a second tornado plot identical to the first, except we omit the
+# ylim parameter, allowing owsa_tornado to automatically determine axis limits.
 
-# Create another tornado plot with the same fixed axis limits
-# This version was historically called "unlimited" but now uses same limits
-# Health economic interpretation: Maintaining consistent €200k-€400k scale
-# Modeling interpretation: Using identical specifications to primary plot
+# Create another tornado plot without custom axis limits
+# This is identical to our previous plot except we don't specify ylim
+# The owsa_tornado function will automatically determine appropriate limits
+# Health economic interpretation: Transparency in visualization choices
+# Modeling interpretation: Allowing automatic axis scaling for comparison
 unlimited_tornado_plot_top10 <- owsa_tornado(
 
   # Use the same filtered data (top 10 parameters only)
-  # This ensures we're comparing apples to apples - same parameters, same scaling
-  # Health economic interpretation: Consistent data and consistent presentation
+  # This ensures we're comparing apples to apples - same parameters, different scaling
+  # Health economic interpretation: Consistent data, different presentation
   owsa = DSAICER_top10,
 
   # Use the same text size for consistency
-  # This ensures visual consistency across all tornado plot variants
-  # Health economic best practice: Standardized formatting for comparability
-  txtsize = 11,
+  # This ensures any visual differences are due to axis scaling, not text size
+  # Health economic best practice: Control variables when comparing visualizations
+  txtsize = 11
 
-  # Apply the same fixed axis limits as the primary tornado plot
-  # This ensures both versions have identical scaling for direct comparison
-  # ylim is a two-element vector: c(minimum, maximum)
-  # Health economic interpretation: Maintaining consistent €200k-€400k scale
-  # Modeling interpretation: Using the same ylim_top10 variable defined earlier
-  # Note: Despite the name "unlimited", we now apply fixed limits for consistency
-  ylim = ylim_top10
+  # Note: No ylim specified here - this is the key difference
+  # owsa_tornado will automatically choose limits based on the data
+  # Typically this will be slightly wider than our custom limits
+  # Health economic interpretation: Letting the software choose "neutral" limits
 )
 
-# Add the same axis labels
-# Both versions now have identical specifications including axis limits
+# Add the same axis label
+# We want everything to be identical except the axis limits
+# This allows fair comparison between the two versions
 # Health economic interpretation: Consistent labeling for comparability
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
   # Label both axes
-  # Identical to the primary version
-  labs(x = "ICER (€ per QALY)", y = "Parameter")
+  # Identical to the limited version
+  labs(y = "ICER (€ per QALY)", x = "Parameter")
 
-# Create a title for this version
-# We retain "Unlimited Scale" in the title for backward compatibility
-# even though both versions now use the same fixed €200k-€400k limits
-# This maintains consistency with existing file naming conventions
+# Create a title indicating this is the unlimited scale version
+# We add "Unlimited Scale" to the title to distinguish it from the limited version
+# This makes it clear which version is which when comparing files
 # Health economic interpretation: Clear labeling of visualization variants
 plot_title_unlimited_top10 <- paste(
   "Tornado Plot - Top 10 Most Influential Parameters (",
   country_name[1],
-  ") - Unlimited Scale",  # Note: Both versions now use same fixed limits
+  ") - Unlimited Scale",  # This is the key addition
   sep = ""
 )
 
 # Add the title and apply the same formatting
-# Both versions now match in all specifications (data, limits, formatting)
-# except for the title text which distinguishes them for file naming
+# Everything should match the limited version except the title text
 # Health economic best practice: Consistent formatting across related figures
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
-  # Add the title
+  # Add the modified title
   ggtitle(plot_title_unlimited_top10) +
   # Apply identical theme settings
   theme(
@@ -7968,7 +6997,7 @@ unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
   )
 
 # Add the same abbreviations caption
-# The footnote is identical to the primary version
+# The footnote should be identical to the limited version
 # This ensures both plots are equally self-explanatory
 # Health economic interpretation: Consistent accessibility across variants
 unlimited_tornado_plot_top10 <- unlimited_tornado_plot_top10 +
@@ -8052,7 +7081,7 @@ print(paste("Unlimited top 10 tornado plot saved successfully as:", file_unlimit
 #
 #   This provides:
 #   - Clear, focused visualization (not cluttered)
-#   - Appropriate axis scaling (fixed €100k-€400k range)
+#   - Appropriate axis scaling (with 5% buffer)
 #   - Self-contained with abbreviations footnote
 #   - Publication-quality resolution (600 DPI)
 #
@@ -8492,45 +7521,6 @@ m_coef_weibull_OS_SoC <- mvrnorm(
 head(m_coef_weibull_OS_SoC)
 
 
-# ============================================================================
-# GAMMA DISTRIBUTION PARAMETER SAMPLING FOR PSA
-# ============================================================================
-#
-# PSA APPROACH FOR SCENARIO ANALYSIS:
-# To enable a PSA-based comparison between Weibull and gamma distributions,
-# we need to sample parameter uncertainty for BOTH distributions.
-#
-# This ensures that when we compare Weibull vs Gamma scenarios:
-#   1. Both comparisons reflect parameter uncertainty (not just structural choice)
-#   2. The comparison is "apples to apples" (both using PSA means, not deterministic)
-#   3. We can report credible intervals for the difference between distributions
-#
-# GAMMA DISTRIBUTION PARAMETERS FOR TTP (Time To Progression):
-# Using the same multivariate normal sampling approach as Weibull.
-# l_TTP_SoC_gamma was already fitted earlier in the survival modeling section.
-# We sample from the joint distribution of shape and rate parameters.
-#
-m_coef_gamma_SoC <- mvrnorm(
-  n     = n_runs,                        # Number of PSA simulations
-  mu    = l_TTP_SoC_gamma$coefficients,  # Mean: fitted gamma coefficients (log scale)
-  Sigma = l_TTP_SoC_gamma$cov            # Covariance matrix from gamma fit
-)
-
-head(m_coef_gamma_SoC)
-
-# GAMMA DISTRIBUTION PARAMETERS FOR TTD (Time To Death / Overall Survival):
-# Sample parameter uncertainty for gamma distribution for overall survival.
-# l_TTD_SoC_gamma was already fitted earlier in the survival modeling section.
-# We sample from the joint distribution of shape and rate parameters.
-#
-m_coef_gamma_OS_SoC <- mvrnorm(
-  n     = n_runs,                        # Number of PSA simulations
-  mu    = l_TTD_SoC_gamma$coefficients,  # Mean: fitted gamma coefficients (log scale)
-  Sigma = l_TTD_SoC_gamma$cov            # Covariance matrix from gamma fit
-)
-
-head(m_coef_gamma_OS_SoC)
-
 
 # Now that we have applied mvrnorm to get a random shape and a random scale we don't need to include HR_FP_SoC in our data.frame to create random probability draws for SoC, because we can just select the shape and scale from m_coef_weibull_SoC so that in our function the updated coef_weibull_shape_SoC and coef_weibull_scale_SoC are used to generate S_FP_SoC with a random value, which will in turn generate transition probabilities under standard of care with a random value.
 
@@ -8587,27 +7577,13 @@ MEAN_HR_PD_Exp <- HR_PD_Exp
 # So, this is the PSA input dataset.
 
 df_PA_input <- data.frame(
-  # -------------------------------------------------------------------------
-  # WEIBULL DISTRIBUTION PARAMETERS FOR PSA
-  # -------------------------------------------------------------------------
-  # These parameters are used when curve_choice = "weibull" (the base case)
   coef_weibull_shape_SoC = m_coef_weibull_SoC[ , "shape"],
   coef_weibull_scale_SoC = m_coef_weibull_SoC[ , "scale"],
   coef_TTD_weibull_shape_SoC = m_coef_weibull_OS_SoC[ , "shape"],
   coef_TTD_weibull_scale_SoC = m_coef_weibull_OS_SoC[ , "scale"],
+             
 
-  # -------------------------------------------------------------------------
-  # GAMMA DISTRIBUTION PARAMETERS FOR PSA (SCENARIO ANALYSIS)
-  # -------------------------------------------------------------------------
-  # These parameters are used when curve_choice = "gamma" (scenario analysis)
-  # Including them in df_PA_input enables PSA-based Weibull vs Gamma comparison
-  # The oncologySemiMarkov function will use these when curve_choice = "gamma"
-  coef_gamma_shape_SoC = m_coef_gamma_SoC[ , "shape"],
-  coef_gamma_rate_SoC = m_coef_gamma_SoC[ , "rate"],
-  coef_TTD_gamma_shape_SoC = m_coef_gamma_OS_SoC[ , "shape"],
-  coef_TTD_gamma_rate_SoC = m_coef_gamma_OS_SoC[ , "rate"],
-
-
+  
 ### Hazard Ratios  
   
 # People use exp for rnorm (i.e., to make random draws from a normal distribution) but I to use want rlnorm.
@@ -9873,26 +8849,6 @@ head(df_PA_input)
 ```{r}
 
 # 09.1 Conduct probabilistic sensitivity analysis
-#
-# ============================================================================
-# **CRITICAL METHODOLOGICAL NOTE - PSA AS BASE CASE:**
-# ============================================================================
-#
-# This PSA analysis produces the "BASE CASE" results for the manuscript.
-# All reported ICERs, costs, and QALYs are derived from PSA MEANS, not from
-# deterministic single-run values.
-#
-# Key points:
-#   1. This PSA uses Weibull distribution (curve_choice defaults to "weibull")
-#   2. Results from this PSA (PSA means) = "base case" results
-#   3. All ICERs are calculated from PSA means: ICER = ΔCost_mean / ΔQALY_mean
-#   4. All uncertainty is quantified via 95% CrIs from PSA distributions
-#   5. The gamma scenario (earlier in this file) is also PSA-based for consistency
-#
-# This approach aligns with reviewer feedback to treat PSA as the effective
-# base case rather than reporting deterministic values with PSA as sensitivity.
-#
-# ============================================================================
 
 # Running the probabilistic analysis :
 
@@ -11070,7 +10026,7 @@ cat("\nFormatted summary table saved to:", formatted_filename, "\n\n")
 #
 # DEFENSIVE PROGRAMMING RATIONALE:
 # -----------------------------------------------------------------------------
-# We cannot assume all three country analyses have been run. If this is someones first time using my code they could easily be:
+# We cannot assume all three country analyses have been run. The user may:
 # - Still be working through the countries sequentially
 # - Have re-run one country after making changes
 # - Be testing with a subset of countries
@@ -12251,26 +11207,55 @@ for (ctry in countries_to_analyze) {
   cat("COUNTRY:", ctry, "\n")
   cat("========================================================================\n")
 
-  # Set country-specific parameters using helper function
-  # ------------------------------------------------------
-  # The get_country_params() function (defined earlier in this document)
-  # returns all country-specific costs, WTP threshold, and discount rates.
-  # This ensures consistency across all analyses and avoids hard-coding values.
+  # Set country-specific parameters
+  # --------------------------------
+  # NOTE: In the actual implementation, you would need to extract these from
+  #       the country blocks defined earlier in the document. For now, we
+  #       assume they are set correctly by uncommenting the appropriate block.
+  #
+  # For a fully automated approach, you could define a helper function:
+  #   get_country_params <- function(country_name) { ... }
+  # that returns a list with c_PFS_Folfox, n_wtp, discount_rate, etc.
+  #
+  # For this demonstration, we'll manually set them based on the country:
 
-  params_ctry <- get_country_params(ctry)
-
-  # Extract country-specific parameters
-  c_PFS_Folfox_ctry <- params_ctry$c_PFS_Folfox
-  c_PFS_Bevacizumab_ctry <- params_ctry$c_PFS_Bevacizumab
-  c_OS_Folfiri_ctry <- params_ctry$c_OS_Folfiri
-  administration_cost_ctry <- params_ctry$administration_cost
-  subtyping_test_cost_ctry <- params_ctry$subtyping_test_cost
-  c_AE1_ctry <- params_ctry$c_AE1
-  c_AE2_ctry <- params_ctry$c_AE2
-  c_AE3_ctry <- params_ctry$c_AE3
-  n_wtp_ctry <- params_ctry$n_wtp
-  d_c_ctry <- params_ctry$country_discount_rate
-  d_e_ctry <- params_ctry$country_discount_rate  # Assume same rate for costs and effects
+  if (ctry == "Ireland") {
+    c_PFS_Folfox_ctry <- 157.77
+    c_PFS_Bevacizumab_ctry <- 1425.84
+    c_OS_Folfiri_ctry <- 167.10
+    administration_cost_ctry <- 406.50
+    subtyping_test_cost_ctry <- 400
+    c_AE1_ctry <- 3485.23
+    c_AE2_ctry <- 1792.82
+    c_AE3_ctry <- 502.69
+    n_wtp_ctry <- 45000
+    d_c_ctry <- 0.04
+    d_e_ctry <- 0.04
+  } else if (ctry == "Germany") {
+    c_PFS_Folfox_ctry <- ((1406.37 / 30) * 14)
+    c_PFS_Bevacizumab_ctry <- ((3252.19 / 30) * 14)
+    c_OS_Folfiri_ctry <- ((1442.70 / 30) * 14)
+    administration_cost_ctry <- 1927.72
+    subtyping_test_cost_ctry <- 400
+    c_AE1_ctry <- 4188.31
+    c_AE2_ctry <- 1982.68
+    c_AE3_ctry <- 1307.72
+    n_wtp_ctry <- 78871
+    d_c_ctry <- 0.03
+    d_e_ctry <- 0.03
+  } else if (ctry == "Spain") {
+    c_PFS_Folfox_ctry <- 122.84
+    c_PFS_Bevacizumab_ctry <- 885.60
+    c_OS_Folfiri_ctry <- 154.38
+    administration_cost_ctry <- 378.92
+    subtyping_test_cost_ctry <- 400
+    c_AE1_ctry <- 2866.15
+    c_AE2_ctry <- 1549.30
+    c_AE3_ctry <- 330.91
+    n_wtp_ctry <- 30000
+    d_c_ctry <- 0.03
+    d_e_ctry <- 0.03
+  }
 
   for (scen in scenarios_to_run) {
     # Inner loop: iterate over scenarios for this country
@@ -12351,14 +11336,9 @@ for (ctry in countries_to_analyze) {
       AE2_DisUtil = AE2_DisUtil,
       AE3_DisUtil = AE3_DisUtil,
 
-      # Country-specific discount rates (converted to daily for 14-day cycles)
-      # NOTE: Annual rates must be converted to daily rates because the model
-      #       uses 14-day cycles with t_cycle = 14 days. The discounting formula
-      #       v_dwc <- 1 / ((1 + d_c) ^ ((0:(n_cycle-1)) * t_cycle))
-      #       multiplies the discount rate by t_cycle (in days), so d_c and d_e
-      #       must be in daily units for correct discounting over the time horizon.
-      d_e = d_e_ctry / 365,
-      d_c = d_c_ctry / 365,
+      # Country-specific discount rates
+      d_e = d_e_ctry,
+      d_c = d_c_ctry,
 
       # Other parameters (assumed already defined earlier)
       n_cycle = n_cycle,

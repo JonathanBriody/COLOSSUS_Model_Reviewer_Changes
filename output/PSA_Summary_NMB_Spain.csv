@@ -1,0 +1,2 @@
+"Country","WTP_Threshold","Incremental_Cost_Mean","Incremental_Cost_Lower_CrI","Incremental_Cost_Upper_CrI","Incremental_QALY_Mean","Incremental_QALY_Lower_CrI","Incremental_QALY_Upper_CrI","Incremental_NMB_Mean","Incremental_NMB_Lower_CrI","Incremental_NMB_Upper_CrI"
+"Spain",30000,34810.5889855985,26141.2532911379,44847.7542105398,0.172889002954998,0.0669259957370945,0.291819666901738,-29623.9188969485,-37663.309407233,-22773.4719227855
