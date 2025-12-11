@@ -13074,7 +13074,7 @@ for (current_age_band in age_bands_to_test) {
                                 "_age_band_", safe_band_name, ".csv")
  write.csv(df_cea_band,
            file = file.path("output", output_filename_band),
-           row_names = FALSE)
+           row.names = FALSE)
  cat("    Saved:", output_filename_band, "\n")
 
  # Save scatter plot for this age band
