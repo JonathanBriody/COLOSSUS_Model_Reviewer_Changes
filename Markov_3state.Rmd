@@ -384,7 +384,7 @@ print(mcrc_pd_studies[, c("study_id", "line_or_state", "mean_utility")])
 cat("\n")
 
 # STEP 1B: DIAGNOSTIC - Check for NA utilities in matched studies
-# ----------------------------------------------------------------
+# -----------------------------------------------------------------
 # This validation step checks if any matched studies have NA utility values,
 # which would cause the mean() calculation to fail or return NA.
 
