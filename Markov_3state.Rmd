@@ -412,28 +412,104 @@ get_popnorm_utility <- function(country,     # Character string: "Ireland", "Ger
 
 # STEP 1: Split mCRC evidence into PFS-like and PD-like states
 # -------------------------------------------------------------
-# PFS-like: Survivors, pre-progression, on treatment, stable disease, NOT in palliative care
-# PD-like:  Progressed, post-progression, palliative care, refractory, best supportive care
+# PREVIOUS APPROACH (REMOVED):
+#   Used grepl() on line_or_state to classify studies based on keywords.
+#   This was error-prone because studies might use non-standard terminology.
+#
+# NEW APPROACH:
+#   The mCRC_Utility_Evidence_TableB.csv now includes a "state_category" column
+#   with manually curated values:
+#     - "PFS-like": Progression-free survival state (stable, on treatment, survivors)
+#     - "PD-like":  Progressed disease state (progressed, palliative, end-stage)
+#     - "Both":     Studies reporting values usable for either state (recoded to PFS-like)
+#     - NA:         Studies excluded from multiplier calculation (e.g., hypothetical valuations)
+#
+# This approach is more reliable because:
+#   1. State classification is explicit and human-reviewed
+#   2. No regex pattern-matching ambiguity
+#   3. "Both" category allows flexibility for ambiguous states
+#   4. NA category excludes irrelevant studies without complex exclusion logic
 
-# Identify PFS-like rows using keyword search in line_or_state column
-mcrc_pfs_studies <- df_mcrc_util[
-  grepl("Survivor|Pre-progression|not in palliative|Metastatic disease \\(not",
-        df_mcrc_util$line_or_state,
-        ignore.case = TRUE),  # ignore.case = TRUE makes search case-insensitive
+# STEP 1A: Create curated dataset
+# --------------------------------
+# Filter df_mcrc_util to include only rows where:
+#   - state_category is NOT NA (i.e., has been manually classified)
+#   - mean_utility is NOT NA (i.e., has a valid utility value)
+# This removes unclassified studies and studies with missing utility data.
+
+df_mcrc_util_curated <- df_mcrc_util[
+  !is.na(df_mcrc_util$state_category) & !is.na(df_mcrc_util$mean_utility),
 ]
-# grepl() searches for pattern in each element of line_or_state
-# Returns TRUE/FALSE vector used to subset df_mcrc_util
-# Example: "Survivors" → TRUE, "Palliative care" → FALSE
+# !is.na() returns TRUE where value is NOT missing
+# & combines two conditions (both must be TRUE)
+# Result: only rows with both valid state_category AND valid mean_utility
 
-# Identify PD-like rows using keyword search
-mcrc_pd_studies <- df_mcrc_util[
-  grepl("Progressed|Post-progression|Palliative|Refractory|died|Best supportive",
-        df_mcrc_util$line_or_state,
-        ignore.case = TRUE),
-]
-# Captures studies reporting utilities for advanced/end-stage disease
+# Print summary of curation
+cat("\n=== mCRC UTILITY DATA CURATION ===\n")
+cat("Total rows in df_mcrc_util:        ", nrow(df_mcrc_util), "\n")
+cat("Rows with non-NA state_category:   ", sum(!is.na(df_mcrc_util$state_category)), "\n")
+cat("Rows with non-NA mean_utility:     ", sum(!is.na(df_mcrc_util$mean_utility)), "\n")
+cat("Rows in curated dataset:           ", nrow(df_mcrc_util_curated), "\n")
+cat("\n")
 
-# Print classification results for transparency
+# STEP 1B: Recode "Both" to "PFS-like"
+# -------------------------------------
+# ============================================================================
+# BASE-CASE MODELLING ASSUMPTION:
+# ============================================================================
+# Studies with state_category = "Both" are recoded to "PFS-like".
+#
+# RATIONALE:
+#   Some studies (e.g., Färkkilä 2013 "metastatic, not in palliative care") report
+#   utilities for patients who could be considered either PFS-like or PD-like.
+#   For the base-case analysis, we treat these as PFS-like because:
+#     - They represent patients still receiving active treatment
+#     - "Not in palliative care" suggests pre-terminal state
+#     - This is a conservative assumption (PFS utilities typically higher)
+#
+# SCENARIO ANALYSIS:
+#   To test sensitivity to this assumption, you can modify this section to:
+#     - Recode "Both" → "PD-like" instead
+#     - Exclude "Both" studies entirely
+#     - Create separate scenarios with different recoding rules
+#
+# TO CHANGE THIS ASSUMPTION:
+#   1. Modify the line: df_mcrc_util_curated$state_category[...] <- "PFS-like"
+#   2. Change "PFS-like" to "PD-like" or add exclusion logic
+# ============================================================================
+
+# Count "Both" before recoding (for transparency)
+n_both_before <- sum(df_mcrc_util_curated$state_category == "Both", na.rm = TRUE)
+# na.rm = TRUE handles any edge cases (shouldn't occur after filtering)
+
+if (n_both_before > 0) {
+  cat("Recoding state_category:\n")
+  cat("  Found", n_both_before, "studies with state_category = 'Both'\n")
+  cat("  These will be recoded to 'PFS-like' for base-case analysis.\n")
+  cat("  Rationale: 'Both' studies (e.g., Färkkilä metastatic, not-palliative)\n")
+  cat("             represent patients on active treatment, not end-stage.\n")
+  cat("  [BASE-CASE ASSUMPTION - see code comments for scenario alternatives]\n")
+  cat("\n")
+}
+
+# Perform the recoding
+df_mcrc_util_curated$state_category[df_mcrc_util_curated$state_category == "Both"] <- "PFS-like"
+# Direct assignment: where state_category equals "Both", replace with "PFS-like"
+
+# STEP 1C: Split into PFS-like and PD-like subsets
+# --------------------------------------------------
+# Now that "Both" has been recoded, split the curated dataset into two subsets:
+#   - mcrc_pfs_studies: rows where state_category == "PFS-like"
+#   - mcrc_pd_studies:  rows where state_category == "PD-like"
+
+mcrc_pfs_studies <- df_mcrc_util_curated[df_mcrc_util_curated$state_category == "PFS-like", ]
+# Subset operator: keep only rows where state_category equals "PFS-like"
+
+mcrc_pd_studies <- df_mcrc_util_curated[df_mcrc_util_curated$state_category == "PD-like", ]
+# Subset operator: keep only rows where state_category equals "PD-like"
+
+# STEP 1D: Print classification results for transparency
+# -------------------------------------------------------
 # Using explicit cat() statements to ensure output displays in RMarkdown
 cat("\n=== mCRC UTILITY CLASSIFICATION ===\n\n")
 
@@ -443,11 +519,12 @@ cat(paste0(rep("-", 80), collapse = ""), "\n")
 if (nrow(mcrc_pfs_studies) > 0) {
   for (i in 1:nrow(mcrc_pfs_studies)) {
     cat(sprintf("  [%d] %s\n", i, mcrc_pfs_studies$study_id[i]))
-    cat(sprintf("      State: %s\n", mcrc_pfs_studies$line_or_state[i]))
-    cat(sprintf("      Utility: %s\n", mcrc_pfs_studies$mean_utility[i]))
+    cat(sprintf("      State:    %s\n", mcrc_pfs_studies$line_or_state[i]))
+    cat(sprintf("      Category: %s\n", mcrc_pfs_studies$state_category[i]))
+    cat(sprintf("      Utility:  %s\n", mcrc_pfs_studies$mean_utility[i]))
   }
 } else {
-  cat("  (No PFS-like studies found - check grepl patterns)\n")
+  cat("  (No PFS-like studies found - check state_category column in CSV)\n")
 }
 cat("\n")
 
@@ -457,26 +534,33 @@ cat(paste0(rep("-", 80), collapse = ""), "\n")
 if (nrow(mcrc_pd_studies) > 0) {
   for (i in 1:nrow(mcrc_pd_studies)) {
     cat(sprintf("  [%d] %s\n", i, mcrc_pd_studies$study_id[i]))
-    cat(sprintf("      State: %s\n", mcrc_pd_studies$line_or_state[i]))
-    cat(sprintf("      Utility: %s\n", mcrc_pd_studies$mean_utility[i]))
+    cat(sprintf("      State:    %s\n", mcrc_pd_studies$line_or_state[i]))
+    cat(sprintf("      Category: %s\n", mcrc_pd_studies$state_category[i]))
+    cat(sprintf("      Utility:  %s\n", mcrc_pd_studies$mean_utility[i]))
   }
 } else {
-  cat("  (No PD-like studies found - check grepl patterns)\n")
+  cat("  (No PD-like studies found - check state_category column in CSV)\n")
 }
 cat("\n")
 
-# STEP 1B: DIAGNOSTIC - Check for NA utilities in matched studies
+# STEP 1E: DIAGNOSTIC - Check for NA utilities in matched studies
 # -----------------------------------------------------------------
 # This validation step checks if any matched studies have NA utility values,
 # which would cause the mean() calculation to fail or return NA.
+# NOTE: This should NOT occur after the curation step above, but we keep
+# the check as a safety net in case of data inconsistencies.
 
 # For PFS-like studies
 pfs_na_count <- sum(is.na(mcrc_pfs_studies$mean_utility))
 if (pfs_na_count > 0) {
   cat("\n!!! WARNING: Found", pfs_na_count, "PFS-like studies with NA utilities !!!\n")
   cat("These studies will be excluded from mean calculation:\n")
-  print(mcrc_pfs_studies[is.na(mcrc_pfs_studies$mean_utility),
-                         c("study_id", "line_or_state", "mean_utility")])
+  for (i in which(is.na(mcrc_pfs_studies$mean_utility))) {
+    cat(sprintf("  - %s: %s (state_category: %s)\n",
+                mcrc_pfs_studies$study_id[i],
+                mcrc_pfs_studies$line_or_state[i],
+                mcrc_pfs_studies$state_category[i]))
+  }
   cat("\n")
 }
 
@@ -485,14 +569,19 @@ pd_na_count <- sum(is.na(mcrc_pd_studies$mean_utility))
 if (pd_na_count > 0) {
   cat("\n!!! WARNING: Found", pd_na_count, "PD-like studies with NA utilities !!!\n")
   cat("These studies will be excluded from mean calculation:\n")
-  print(mcrc_pd_studies[is.na(mcrc_pd_studies$mean_utility),
-                        c("study_id", "line_or_state", "mean_utility")])
+  for (i in which(is.na(mcrc_pd_studies$mean_utility))) {
+    cat(sprintf("  - %s: %s (state_category: %s)\n",
+                mcrc_pd_studies$study_id[i],
+                mcrc_pd_studies$line_or_state[i],
+                mcrc_pd_studies$state_category[i]))
+  }
   cat("\n")
 }
 
-# STEP 1C: VALIDATION - Ensure we have valid data to work with
+# STEP 1F: VALIDATION - Ensure we have valid data to work with
 # -------------------------------------------------------------
 # Check that we have at least one non-NA utility value for each category
+# This is critical: if no valid utilities exist, the mean() will return NaN
 
 pfs_valid_count <- sum(!is.na(mcrc_pfs_studies$mean_utility))
 pd_valid_count <- sum(!is.na(mcrc_pd_studies$mean_utility))
@@ -503,16 +592,14 @@ if (pfs_valid_count == 0) {
     "PROBLEM:\n",
     "  Found ", nrow(mcrc_pfs_studies), " PFS-like studies, but ALL have NA utilities.\n\n",
     "LIKELY CAUSES:\n",
-    "  1. CSV file has non-numeric characters in mean_utility column (e.g., '~0.45')\n",
-    "  2. R read the column as 'character' type instead of 'numeric'\n",
-    "  3. Encoding issues with special characters in CSV file\n\n",
+    "  1. No studies have state_category = 'PFS-like' in the CSV\n",
+    "  2. All PFS-like studies have NA mean_utility values\n",
+    "  3. The state_category column may not exist or has unexpected values\n\n",
     "SOLUTIONS:\n",
     "  1. Open data/mCRC_Utility_Evidence_TableB.csv\n",
-    "  2. Check that mean_utility column contains only numeric values\n",
-    "  3. Remove any non-numeric characters (like ~, ≈, etc.)\n",
-    "  4. Ensure the CSV is saved with UTF-8 encoding\n",
-    "  5. Re-run this chunk\n\n",
-    "MATCHED STUDIES (with NA utilities):\n"
+    "  2. Ensure state_category column exists with values: PFS-like, PD-like, Both, or NA\n",
+    "  3. Verify at least one row has state_category = 'PFS-like' and valid mean_utility\n",
+    "  4. Re-run this chunk\n"
   ))
 }
 
@@ -522,16 +609,14 @@ if (pd_valid_count == 0) {
     "PROBLEM:\n",
     "  Found ", nrow(mcrc_pd_studies), " PD-like studies, but ALL have NA utilities.\n\n",
     "LIKELY CAUSES:\n",
-    "  1. CSV file has non-numeric characters in mean_utility column (e.g., '~0.45')\n",
-    "  2. R read the column as 'character' type instead of 'numeric'\n",
-    "  3. Encoding issues with special characters in CSV file\n\n",
+    "  1. No studies have state_category = 'PD-like' in the CSV\n",
+    "  2. All PD-like studies have NA mean_utility values\n",
+    "  3. The state_category column may not exist or has unexpected values\n\n",
     "SOLUTIONS:\n",
     "  1. Open data/mCRC_Utility_Evidence_TableB.csv\n",
-    "  2. Check that mean_utility column contains only numeric values\n",
-    "  3. Remove any non-numeric characters (like ~, ≈, etc.)\n",
-    "  4. Ensure the CSV is saved with UTF-8 encoding\n",
-    "  5. Re-run this chunk\n\n",
-    "MATCHED STUDIES (with NA utilities):\n"
+    "  2. Ensure state_category column exists with values: PFS-like, PD-like, Both, or NA\n",
+    "  3. Verify at least one row has state_category = 'PD-like' and valid mean_utility\n",
+    "  4. Re-run this chunk\n"
   ))
 }
 
