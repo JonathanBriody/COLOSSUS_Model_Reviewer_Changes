@@ -12515,7 +12515,9 @@ for (psa_scen in psa_utility_scenarios) {
   u_F_beta_scen <- u_F_alpha_scen * (1 - u_F_scen) / u_F_scen
 
   # Generate new beta samples
-  set.seed(12345)  # For reproducibility across scenarios
+  # IMPORTANT: Use seed 123 to match the original PSA sampling sequence
+  # This ensures consistency with the main PSA results when comparing scenarios
+  set.seed(123)
   u_F_samples <- rbeta(n_runs, shape1 = u_F_alpha_scen, shape2 = u_F_beta_scen)
 
   cat("  u_F beta params: alpha =", round(u_F_alpha_scen, 4),
@@ -12787,7 +12789,9 @@ u_P_alpha_plus_beta_ramsey <- u_P_ramsey * (1 - u_P_ramsey) / (u_P_se_ramsey^2) 
 u_P_alpha_ramsey <- u_P_ramsey * u_P_alpha_plus_beta_ramsey
 u_P_beta_ramsey <- u_P_alpha_ramsey * (1 - u_P_ramsey) / u_P_ramsey
 
-set.seed(12345)
+# IMPORTANT: Use seed 123 to match the original PSA sampling sequence
+# This ensures the Ramsey baseline here matches the main PSA exactly
+set.seed(123)
 u_F_samples_ramsey <- rbeta(n_runs, shape1 = u_F_alpha_ramsey, shape2 = u_F_beta_ramsey)
 u_P_samples_ramsey <- rbeta(n_runs, shape1 = u_P_alpha_ramsey, shape2 = u_P_beta_ramsey)
 
@@ -12999,7 +13003,9 @@ for (current_age_band in age_bands_to_test) {
  u_P_alpha_band <- u_P_band * u_P_alpha_plus_beta_band
  u_P_beta_band <- u_P_alpha_band * (1 - u_P_band) / u_P_band
 
- set.seed(12345)  # Same seed for reproducibility across scenarios
+ # IMPORTANT: Use seed 123 to match the original PSA sampling sequence
+ # This ensures consistency across all scenarios and with the main PSA
+ set.seed(123)
  u_F_samples_band <- rbeta(n_runs, shape1 = u_F_alpha_band, shape2 = u_F_beta_band)
  u_P_samples_band <- rbeta(n_runs, shape1 = u_P_alpha_band, shape2 = u_P_beta_band)
 
