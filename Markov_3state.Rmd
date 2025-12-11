@@ -167,6 +167,45 @@ p_load_gh("DARTH-git/dampack", "DARTH-git/darthtools")
 # 01.6 LOAD UTILITY DATA FOR SCENARIO ANALYSES
 #===============================================================================
 
+#-------------------------------------------------------------------------------
+# CONFIGURABLE PARAMETERS FOR UTILITY ADJUSTMENTS
+#-------------------------------------------------------------------------------
+# These parameters control how utilities are adjusted for population norms.
+# Change these values to customize the analysis.
+
+# MODEL AGE: The reference age for the patient cohort.
+# This affects which age band is selected from population norm data.
+# Default: 65 (typical for mCRC patient population)
+# Rationale: Median age at mCRC diagnosis is typically 65-70 years
+model_age <- 65
+
+# REFERENCE COUNTRY FOR MULTIPLIER CALCULATION:
+# The country whose population norms are used as the DENOMINATOR when
+# calculating mCRC multipliers. This serves as the "anchor" for the
+# multiplicative adjustment.
+#
+# OPTIONS: "England (UK)", "Ireland", "Germany", "Spain"
+# Default: "England (UK)"
+#
+# IMPORTANT METHODOLOGICAL NOTE:
+# Using UK as reference allows COUNTRY-SPECIFIC adjustments:
+#   mult = mean_mCRC / UK_norm
+#   Ireland_utility = Ireland_norm × mult (differs from UK)
+#   Spain_utility = Spain_norm × mult (differs from UK and Ireland)
+#
+# If you change this to match the analysis country (e.g., Ireland for Ireland):
+#   mult = mean_mCRC / Ireland_norm
+#   Ireland_utility = Ireland_norm × mult = mean_mCRC (same as literature mean)
+# This would REMOVE country differentiation (everyone gets literature mean).
+#
+# The UK-anchored approach is methodologically sound because:
+#   1. UK EQ-5D norms are widely used as reference in European HTA
+#   2. It preserves country-specific QoL differences
+#   3. The multiplier captures "cancer decrement relative to baseline"
+ref_country_for_multipliers <- "England (UK)"
+
+#-------------------------------------------------------------------------------
+
 # HEALTH ECONOMIC CONTEXT: Addressing Reviewer Concern About Utility Values
 # ---------------------------------------------------------------------------
 # Our base case uses utilities from Ramsey et al. (2000):
@@ -292,19 +331,38 @@ get_popnorm_utility <- function(country,     # Character string: "Ireland", "Ger
 
   # STEP 3: Find age band with nearest age_midpoint to input age
   # -------------------------------------------------------------
+  # IMPORTANT: Handle tie-breaking correctly!
+  # Example: age = 65, midpoints = [60, 70, 80]
+  #   - Distance to 60: |60-65| = 5
+  #   - Distance to 70: |70-65| = 5
+  #   - Distance to 80: |80-65| = 15
+  # Age 65 falls in the 65-74 band (midpoint 70), not the 55-64 band (midpoint 60).
+  # So on a tie, we should prefer the band where the age actually falls.
+  #
+  # FIX: On a tie, prefer the band with the HIGHER midpoint (where age is at
+  # the lower boundary) rather than the band where age is at the upper boundary.
+
   age_diffs <- abs(df_country$age_midpoint - age)
-  # abs() takes absolute value (distance between input age and each age_midpoint)
-  # Example: if age = 65 and age_midpoints are [60, 70, 80],
-  #          then age_diffs = [5, 5, 15]
+  min_diff <- min(age_diffs)
+  # Find all indices with the minimum distance (could be multiple if tie)
+  tied_indices <- which(age_diffs == min_diff)
 
-  nearest_idx <- which.min(age_diffs)
-  # which.min() returns the INDEX (position) of the minimum value in age_diffs
-  # Example: which.min([5, 5, 15]) = 1 (first occurrence of minimum value)
+  if (length(tied_indices) > 1) {
+    # TIE-BREAKER: Among tied bands, prefer the one with higher midpoint.
+    # Rationale: Age 65 falls in 65-74 band, not 55-64.
+    # The band with the higher midpoint is the one where the age is at/near
+    # the lower boundary, which is typically the correct band membership.
+    tied_midpoints <- df_country$age_midpoint[tied_indices]
+    nearest_idx <- tied_indices[which.max(tied_midpoints)]
+  } else {
+    nearest_idx <- tied_indices[1]
+  }
 
-  # STEP 4: Extract utility_norm from the nearest age band
+  # STEP 4: Extract utility_norm from the selected age band
   # -------------------------------------------------------
   utility_norm <- df_country$utility_norm[nearest_idx]
-  # Index into the utility_norm column at position nearest_idx
+  selected_band <- df_country$age_band[nearest_idx]
+  selected_midpoint <- df_country$age_midpoint[nearest_idx]
   # Result: single numeric value (e.g., 0.80 for England age 65-74)
 
   # STEP 5: Return the population norm utility
@@ -340,10 +398,10 @@ get_popnorm_utility <- function(country,     # Character string: "Ireland", "Ger
 # ALGEBRA:
 # --------
 # We compute "multipliers" that represent the RATIO of:
-#   mCRC utility / general population utility (UK, age 65)
+#   mCRC utility / reference population utility (ref_country_for_multipliers, model_age)
 #
-# For PFS-like states: mult_PFS = mean(mCRC PFS utilities) / U_ref_uk65
-# For PD-like states:  mult_PD  = mean(mCRC PD utilities)  / U_ref_uk65
+# For PFS-like states: mult_PFS = mean(mCRC PFS utilities) / U_ref
+# For PD-like states:  mult_PD  = mean(mCRC PD utilities)  / U_ref
 #
 # These multipliers are expected to be < 1.0, because cancer patients have
 # lower quality of life than general population.
@@ -376,11 +434,35 @@ mcrc_pd_studies <- df_mcrc_util[
 # Captures studies reporting utilities for advanced/end-stage disease
 
 # Print classification results for transparency
-cat("\n=== mCRC UTILITY CLASSIFICATION ===\n")
+# Using explicit cat() statements to ensure output displays in RMarkdown
+cat("\n=== mCRC UTILITY CLASSIFICATION ===\n\n")
+
+# Print PFS-like studies
 cat("PFS-like states (n =", nrow(mcrc_pfs_studies), "):\n")
-print(mcrc_pfs_studies[, c("study_id", "line_or_state", "mean_utility")])
-cat("\nPD-like states (n =", nrow(mcrc_pd_studies), "):\n")
-print(mcrc_pd_studies[, c("study_id", "line_or_state", "mean_utility")])
+cat(paste0(rep("-", 80), collapse = ""), "\n")
+if (nrow(mcrc_pfs_studies) > 0) {
+  for (i in 1:nrow(mcrc_pfs_studies)) {
+    cat(sprintf("  [%d] %s\n", i, mcrc_pfs_studies$study_id[i]))
+    cat(sprintf("      State: %s\n", mcrc_pfs_studies$line_or_state[i]))
+    cat(sprintf("      Utility: %s\n", mcrc_pfs_studies$mean_utility[i]))
+  }
+} else {
+  cat("  (No PFS-like studies found - check grepl patterns)\n")
+}
+cat("\n")
+
+# Print PD-like studies
+cat("PD-like states (n =", nrow(mcrc_pd_studies), "):\n")
+cat(paste0(rep("-", 80), collapse = ""), "\n")
+if (nrow(mcrc_pd_studies) > 0) {
+  for (i in 1:nrow(mcrc_pd_studies)) {
+    cat(sprintf("  [%d] %s\n", i, mcrc_pd_studies$study_id[i]))
+    cat(sprintf("      State: %s\n", mcrc_pd_studies$line_or_state[i]))
+    cat(sprintf("      Utility: %s\n", mcrc_pd_studies$mean_utility[i]))
+  }
+} else {
+  cat("  (No PD-like studies found - check grepl patterns)\n")
+}
 cat("\n")
 
 # STEP 1B: DIAGNOSTIC - Check for NA utilities in matched studies
@@ -476,23 +558,29 @@ cat("Mean PD-like utility (mCRC literature): ", round(mean_PD_mcrc, 4), "\n")
 cat("  (Computed from", pd_valid_count, "studies with valid utilities)\n")
 cat("\n")
 
-# STEP 3: Get reference UK population norm at age 65
-# ---------------------------------------------------
-U_ref_uk65 <- get_popnorm_utility("England (UK)", 65, df_popnorm)
+# STEP 3: Get reference population norm for multiplier calculation
+# -----------------------------------------------------------------
+# Uses the configurable parameters defined at the top of this chunk:
+#   - ref_country_for_multipliers (default: "England (UK)")
+#   - model_age (default: 65)
+U_ref <- get_popnorm_utility(ref_country_for_multipliers, model_age, df_popnorm)
 # Calls helper function defined above
-# Returns UK EQ-5D norm for age 65-74 band (midpoint 70, but 65 is closest)
+# Returns EQ-5D norm for the specified country and age
 # This serves as denominator for multiplier calculation
 
-cat("Reference UK population norm (age 65):", round(U_ref_uk65, 4), "\n\n")
+cat("=== REFERENCE POPULATION NORM ===\n")
+cat("Reference country: ", ref_country_for_multipliers, "\n")
+cat("Reference age:     ", model_age, "\n")
+cat("Population norm:   ", round(U_ref, 4), "\n\n")
 
 # STEP 4: Calculate mCRC-based multipliers
 # -----------------------------------------
-mult_PFS_mcrc <- mean_PFS_mcrc / U_ref_uk65
+mult_PFS_mcrc <- mean_PFS_mcrc / U_ref
 # Multiplier for PFS state
 # Interpretation: mCRC PFS utility as a PROPORTION of general population utility
 # Expected: < 1.0 (cancer patients have lower QoL than general population)
 
-mult_PD_mcrc <- mean_PD_mcrc / U_ref_uk65
+mult_PD_mcrc <- mean_PD_mcrc / U_ref
 # Multiplier for PD state
 # Expected: << 1.0 (progressed cancer has substantially lower QoL)
 
@@ -508,7 +596,9 @@ if (!is.finite(mult_PFS_mcrc)) {
     "\n=== FATAL ERROR: mult_PFS_mcrc is not finite ===\n\n",
     "  mult_PFS_mcrc = ", mult_PFS_mcrc, "\n",
     "  mean_PFS_mcrc = ", mean_PFS_mcrc, "\n",
-    "  U_ref_uk65 = ", U_ref_uk65, "\n\n",
+    "  U_ref = ", U_ref, "\n",
+    "  Reference country = ", ref_country_for_multipliers, "\n",
+    "  Reference age = ", model_age, "\n\n",
     "This error should not occur if earlier validations passed.\n",
     "Please report this as a bug.\n"
   ))
@@ -519,7 +609,9 @@ if (!is.finite(mult_PD_mcrc)) {
     "\n=== FATAL ERROR: mult_PD_mcrc is not finite ===\n\n",
     "  mult_PD_mcrc = ", mult_PD_mcrc, "\n",
     "  mean_PD_mcrc = ", mean_PD_mcrc, "\n",
-    "  U_ref_uk65 = ", U_ref_uk65, "\n\n",
+    "  U_ref = ", U_ref, "\n",
+    "  Reference country = ", ref_country_for_multipliers, "\n",
+    "  Reference age = ", model_age, "\n\n",
     "This error should not occur if earlier validations passed.\n",
     "Please report this as a bug.\n"
   ))
@@ -529,16 +621,18 @@ if (!is.finite(mult_PD_mcrc)) {
 # (Safe to print now because we know they're valid)
 cat("=== mCRC-BASED MULTIPLIERS ===\n")
 cat("mult_PFS_mcrc (PFS multiplier):", round(mult_PFS_mcrc, 4), "\n")
-cat("  Interpretation: mCRC PFS utility is", round(mult_PFS_mcrc * 100, 1), "% of UK population norm\n")
+cat("  Interpretation: mCRC PFS utility is", round(mult_PFS_mcrc * 100, 1), "% of",
+    ref_country_for_multipliers, "population norm\n")
 cat("mult_PD_mcrc (PD multiplier):  ", round(mult_PD_mcrc, 4), "\n")
-cat("  Interpretation: mCRC PD utility is", round(mult_PD_mcrc * 100, 1), "% of UK population norm\n")
+cat("  Interpretation: mCRC PD utility is", round(mult_PD_mcrc * 100, 1), "% of",
+    ref_country_for_multipliers, "population norm\n")
 cat("\n")
 
 # COMPARISON TO RAMSEY-BASED MULTIPLIERS (for context):
 # ------------------------------------------------------
 # If we had used Ramsey instead:
-#   mult_PFS_ramsey = 0.85 / U_ref_uk65 ≈ 1.06 (EXCEEDS population norm!)
-#   mult_PD_ramsey  = 0.65 / U_ref_uk65 ≈ 0.81
+#   mult_PFS_ramsey = 0.85 / U_ref ≈ 1.06 (EXCEEDS population norm!)
+#   mult_PD_ramsey  = 0.65 / U_ref ≈ 0.81
 # This comparison illustrates why reviewers were concerned: Ramsey PFS > UK norms.
 #
 # With mCRC literature means:
@@ -613,6 +707,15 @@ get_utility_scenario <- function(
     # - Using these values preserves continuity with existing literature
     # - All base case results will match original publication exactly
 
+    # Print utility scenario results for transparency
+    cat("\n=== UTILITY SCENARIO: RAMSEY BASE CASE ===\n")
+    cat("Country requested: ", country, " (not used in base case)\n")
+    cat("Age requested:     ", age, " (not used in base case)\n")
+    cat("PFS utility (u_F): ", ramsey_PFS, "\n")
+    cat("PD utility (u_P):  ", ramsey_PD, "\n")
+    cat("Source: Ramsey et al., 2000 (HUI3, US colorectal cancer survivors)\n")
+    cat("Note: Base case uses fixed Ramsey values, no population norm adjustment.\n\n")
+
     # Return Ramsey values unchanged
     return(list(
       u_PFS       = ramsey_PFS,                    # 0.85 (PFS state utility)
@@ -658,9 +761,9 @@ get_utility_scenario <- function(
 
     # ALGEBRA (step-by-step):
     # -----------------------
-    # At reference (UK, age 65):
-    #   mult_PFS_mcrc = mean_PFS_mcrc / U_ref_uk65
-    #   mult_PD_mcrc  = mean_PD_mcrc  / U_ref_uk65
+    # At reference (ref_country_for_multipliers, model_age):
+    #   mult_PFS_mcrc = mean_PFS_mcrc / U_ref
+    #   mult_PD_mcrc  = mean_PD_mcrc  / U_ref
     # (These were calculated globally in previous chunk)
     #
     # For target country/age:
@@ -668,18 +771,19 @@ get_utility_scenario <- function(
     #   u_PFS_adjusted = U_pop × mult_PFS_mcrc
     #   u_PD_adjusted  = U_pop × mult_PD_mcrc
     #
-    # EXAMPLE (Ireland, age 65):
+    # EXAMPLE (Ireland, age 65, with UK reference):
+    #   U_ref (UK)       = 0.80 (ref_country_for_multipliers population norm)
     #   U_pop_ireland    = 0.879 (Ireland EQ-5D-5L norm, age 65-74)
     #   mult_PFS_mcrc    = 0.82 / 0.80 = 1.025 (assume mean_PFS_mcrc = 0.82)
     #   u_PFS_adjusted   = 0.879 × 1.025 = 0.901
     #   mult_PD_mcrc     = 0.69 / 0.80 = 0.8625 (assume mean_PD_mcrc = 0.69)
     #   u_PD_adjusted    = 0.879 × 0.8625 = 0.758
 
-    # STEP 1: Get reference UK population norm (already calculated globally)
-    # -----------------------------------------------------------------------
-    U_ref <- U_ref_uk65
-    # This was computed in previous chunk: get_popnorm_utility("England (UK)", 65, df_popnorm)
-    # Typical value: ~0.80 (UK EQ-5D-3L norm for age 65-74)
+    # STEP 1: Get reference population norm (already calculated globally as U_ref)
+    # -----------------------------------------------------------------------------
+    # U_ref was computed in previous chunk using:
+    #   get_popnorm_utility(ref_country_for_multipliers, model_age, df_popnorm)
+    # The variable U_ref is available from the global environment.
 
     # STEP 2: Get target country/age population norm
     # -----------------------------------------------
@@ -711,6 +815,23 @@ get_utility_scenario <- function(
 
     u_PD_adjusted <- min(u_PD_adjusted, 1.0)
     # Same capping for PD state (unlikely to exceed 1.0 but included for robustness)
+
+    # Print utility scenario results for transparency
+    cat("\n=== UTILITY SCENARIO: POPULATION NORM ADJUSTED ===\n")
+    cat("Target country:            ", country, "\n")
+    cat("Target age:                ", age, "\n")
+    cat("Reference country:         ", ref_country_for_multipliers, "\n")
+    cat("Reference age:             ", model_age, "\n")
+    cat("Reference pop. norm (U_ref): ", round(U_ref, 4), "\n")
+    cat("Target pop. norm (U_pop):    ", round(U_pop, 4), "\n")
+    cat("PFS multiplier:            ", round(mult_PFS_mcrc, 4), "\n")
+    cat("PD multiplier:             ", round(mult_PD_mcrc, 4), "\n")
+    cat("Adjusted PFS utility (u_F):", round(u_PFS_adjusted, 4), "\n")
+    cat("Adjusted PD utility (u_P): ", round(u_PD_adjusted, 4), "\n")
+    cat("Calculation: u_PFS =", round(U_pop, 4), "×", round(mult_PFS_mcrc, 4),
+        "=", round(u_PFS_adjusted, 4), "\n")
+    cat("Calculation: u_PD  =", round(U_pop, 4), "×", round(mult_PD_mcrc, 4),
+        "=", round(u_PD_adjusted, 4), "\n\n")
 
     # STEP 5: Return adjusted utilities with metadata
     # ------------------------------------------------
@@ -5505,10 +5626,10 @@ d_e <- country_discount_rate / 365
 
 # Get utilities for the selected scenario and default country
 # This ensures u_F and u_P are set correctly for downstream chunks
-patient_age <- 65
+# Uses model_age defined in chunk 01.6 (default: 65)
 utility_result <- get_utility_scenario(
   country = country_name,
-  age = patient_age,
+  age = model_age,
   utility_scenario = utility_scenario_main,
   df_popnorm = df_popnorm
 )
@@ -12538,8 +12659,8 @@ countries_to_analyze <- c("Ireland", "Germany", "Spain")
 scenarios_to_run <- c("ramsey_basecase", "population_norm_adjusted")
 # List of utility scenarios to compare
 
-patient_age_for_analysis <- 65
-# Representative age for mCRC patients (used for population norm lookup)
+# Use model_age defined in chunk 01.6 for population norm lookup
+# (Default: 65, representative age for mCRC patients)
 
 # Initialize results data frame
 # ------------------------------
@@ -12590,7 +12711,7 @@ for (ctry in countries_to_analyze) {
     # ----------------------------------------
     utility_result_scen <- get_utility_scenario(
       country = ctry,                      # Current country
-      age = patient_age_for_analysis,      # Patient age (65)
+      age = model_age,                     # Patient age (from chunk 01.6, default: 65)
       utility_scenario = scen,             # Current scenario
       df_popnorm = df_popnorm              # Population norms data
     )
