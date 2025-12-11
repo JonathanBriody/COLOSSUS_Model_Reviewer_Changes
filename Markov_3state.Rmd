@@ -12632,6 +12632,597 @@ cat("\n")
 ```
 
 ```{r}
+#===============================================================================
+# 09.3.1.2 PSA FOR AGE-BAND SENSITIVITY ANALYSIS (ANCHOR ANALYSIS)
+#===============================================================================
+
+# CONTEXT: Age-Band Sensitivity Analysis via Probabilistic Sensitivity Analysis
+# ==============================================================================
+#
+# WHAT THIS ANALYSIS DOES:
+# ------------------------
+# This section extends the PSA framework to run a SENSITIVITY ANALYSIS over
+# different AGE BANDS. The anchor analysis interprets mCRC utilities relative
+# to general population norms, and this sensitivity analysis explores how
+# cost-effectiveness conclusions change when we assume different patient ages.
+#
+# WHY AGE BANDS MATTER:
+# ---------------------
+# 1. Population utility norms DECLINE with age:
+#      - 55-64: Higher norms (e.g., England = 0.83)
+#      - 65-74: Moderate norms (e.g., England = 0.80)
+#      - 75+:   Lower norms (e.g., England = 0.73)
+#
+# 2. When we anchor mCRC utilities to population norms:
+#      - Older cohorts → Lower baseline → Lower anchored cancer utilities
+#      - This affects QALYs gained and therefore ICERs
+#
+# 3. CLINICAL RELEVANCE:
+#      - Median age at mCRC diagnosis: 65-70 years
+#      - Patient population includes a range of ages
+#      - Payers may want to know: "How does cost-effectiveness vary by age?"
+#
+# CRITICAL METHODOLOGICAL POINT:
+# ------------------------------
+# In each sensitivity run, ALL FOUR COUNTRIES (England, Ireland, Germany, Spain)
+# use the SAME age band. For example:
+#   - When testing "65-74", ALL countries use their 65-74 norms
+#   - We do NOT mix age bands across countries
+# This ensures we're comparing like-for-like: "What if the cohort were 65-74?"
+#
+# COMPARISON TO BASE CASE:
+# ------------------------
+# The summary table compares each age-band scenario to:
+#   1. Ramsey base case (no population norm adjustment)
+#   2. Other age bands (to show sensitivity gradient)
+# This helps reviewers understand robustness of conclusions.
+#
+# OUTPUT FILES:
+# -------------
+#   - Probabilistic_ICER_For_<country>_age_band_55-64.csv
+#   - Probabilistic_ICER_For_<country>_age_band_65-74.csv
+#   - Probabilistic_ICER_For_<country>_age_band_75+.csv
+#   - Age_Band_PSA_Sensitivity_Summary_<country>.csv
+#   - Age_Band_Utilities_All_Countries.csv (cross-country utility table)
+#   - CE scatter plots for each age band
+
+cat("\n")
+cat("================================================================================\n")
+cat("PSA AGE-BAND SENSITIVITY ANALYSIS (ANCHOR ANALYSIS)\n")
+cat("================================================================================\n")
+cat("\n")
+
+#-------------------------------------------------------------------------------
+# SECTION A: DEFINE AGE BANDS AND LOOKUP TABLE
+#-------------------------------------------------------------------------------
+
+# Age bands to test in sensitivity analysis
+# These match the age bands in population_norm_utilities_by_country_age.csv
+age_bands_to_test <- c("55-64", "65-74", "75+")
+
+# Create lookup table: age_band → age_midpoint
+# This is used when we need to pass a numeric age to functions
+age_band_lookup <- data.frame(
+ age_band = c("55-64", "65-74", "75+"),
+ age_midpoint = c(60, 70, 80),
+ stringsAsFactors = FALSE
+)
+# Explanation:
+#   - "55-64" band has midpoint 60 (average of 55 and 64, rounded)
+#   - "65-74" band has midpoint 70 (average of 65 and 74, rounded)
+#   - "75+" band has midpoint 80 (assuming typical upper bound ~85)
+
+# Countries to include in utility table (for documentation)
+countries_for_utility_table <- c("England (UK)", "Ireland", "Germany", "Spain")
+
+cat("Age bands to test:", paste(age_bands_to_test, collapse = ", "), "\n")
+cat("Reference country for multipliers:", ref_country_for_multipliers, "\n")
+cat("Analysis country:", country_name, "\n\n")
+
+#-------------------------------------------------------------------------------
+# SECTION B: INITIALIZE STORAGE DATA FRAMES
+#-------------------------------------------------------------------------------
+
+# B1: Master results storage for PSA ICERs across age bands
+# Each row = one age band scenario + Ramsey baseline
+df_age_band_psa_results <- data.frame(
+ scenario = character(),
+ age_band = character(),
+ u_F_mean = numeric(),           # Mean PFS utility used in PSA
+ u_P_mean = numeric(),           # Mean PD utility used in PSA
+ SoC_Cost = numeric(),           # Mean cost for SoC arm
+ SoC_QALY = numeric(),           # Mean QALYs for SoC arm
+ Bev_Cost = numeric(),           # Mean cost for Bevacizumab arm
+ Bev_QALY = numeric(),           # Mean QALYs for Bevacizumab arm
+ Inc_Cost = numeric(),           # Incremental cost (Bev - SoC)
+ Inc_QALY = numeric(),           # Incremental QALYs (Bev - SoC)
+ ICER = numeric(),               # Incremental cost-effectiveness ratio
+ stringsAsFactors = FALSE
+)
+
+# B2: Utility table showing anchored utilities for all countries × all age bands
+# This provides transparency on how utilities vary across the sensitivity analysis
+df_age_band_utilities <- data.frame(
+ age_band = character(),
+ country = character(),
+ state_category = character(),   # "PFS-like" or "PD-like"
+ U_pop_norm = numeric(),         # Country/age-specific population norm
+ U_ref_band = numeric(),         # Reference (UK) norm for this age band
+ multiplier = numeric(),         # mCRC multiplier (mean_mCRC / U_ref)
+ anchored_utility = numeric(),   # Final anchored utility (U_pop × multiplier)
+ stringsAsFactors = FALSE
+)
+
+# Store original df_PA_input utilities to restore later
+original_u_F_age <- df_PA_input$u_F
+original_u_P_age <- df_PA_input$u_P
+
+# PSA utility ranges (same as used in prior PSA sections)
+u_F_min_age <- 0.68
+u_F_max_age <- 1.00
+u_P_min_age <- 0.52
+u_P_max_age <- 0.78
+
+#-------------------------------------------------------------------------------
+# SECTION C: FIRST, RUN RAMSEY BASE CASE PSA FOR COMPARISON
+#-------------------------------------------------------------------------------
+# We need Ramsey results as the comparator for calculating % change
+
+cat("========================================================================\n")
+cat("RUNNING RAMSEY BASE CASE PSA (for comparison baseline)\n")
+cat("========================================================================\n\n")
+
+# Ramsey utilities (fixed, no age/country adjustment)
+u_F_ramsey <- 0.85
+u_P_ramsey <- 0.65
+
+# Regenerate beta distribution samples for Ramsey utilities
+u_F_se_ramsey <- (u_F_max_age - u_F_min_age) / (2 * 1.96)
+u_F_alpha_plus_beta_ramsey <- u_F_ramsey * (1 - u_F_ramsey) / (u_F_se_ramsey^2) - 1
+u_F_alpha_ramsey <- u_F_ramsey * u_F_alpha_plus_beta_ramsey
+u_F_beta_ramsey <- u_F_alpha_ramsey * (1 - u_F_ramsey) / u_F_ramsey
+
+u_P_se_ramsey <- (u_P_max_age - u_P_ramsey) / 1.96
+u_P_alpha_plus_beta_ramsey <- u_P_ramsey * (1 - u_P_ramsey) / (u_P_se_ramsey^2) - 1
+u_P_alpha_ramsey <- u_P_ramsey * u_P_alpha_plus_beta_ramsey
+u_P_beta_ramsey <- u_P_alpha_ramsey * (1 - u_P_ramsey) / u_P_ramsey
+
+set.seed(12345)
+u_F_samples_ramsey <- rbeta(n_runs, shape1 = u_F_alpha_ramsey, shape2 = u_F_beta_ramsey)
+u_P_samples_ramsey <- rbeta(n_runs, shape1 = u_P_alpha_ramsey, shape2 = u_P_beta_ramsey)
+
+df_PA_input$u_F <- u_F_samples_ramsey
+df_PA_input$u_P <- u_P_samples_ramsey
+
+cat("  u_F (Ramsey PFS):", u_F_ramsey, "\n")
+cat("  u_P (Ramsey PD): ", u_P_ramsey, "\n")
+cat("  Running PSA loop (", n_runs, " iterations)...\n", sep = "")
+
+df_c_ramsey <- df_e_ramsey <- data.frame(SoC = rep(NA, n_runs), Exp = rep(NA, n_runs))
+
+for (i_run in 1:n_runs) {
+ l_out_temp <- oncologySemiMarkov(l_params_all = df_PA_input[i_run, ], n_wtp = n_wtp)
+ df_c_ramsey[i_run, ] <- l_out_temp$Cost
+ df_e_ramsey[i_run, ] <- l_out_temp$Effect
+ if (i_run / (n_runs / 10) == round(i_run / (n_runs / 10), 0)) {
+   cat('\r', paste("  ", i_run / n_runs * 100, "% done", sep = ""))
+ }
+}
+cat("\n")
+
+l_PA_ramsey <- make_psa_obj(
+ cost = df_c_ramsey,
+ effectiveness = df_e_ramsey,
+ parameters = df_PA_input,
+ strategies = c("SoC", "Bev"),
+ currency = "€"
+)
+
+df_out_ce_ramsey <- summary(l_PA_ramsey)
+df_cea_ramsey <- calculate_icers(
+ cost = df_out_ce_ramsey$meanCost,
+ effect = df_out_ce_ramsey$meanEffect,
+ strategies = df_out_ce_ramsey$Strategy
+)
+
+cat("\n  Ramsey Base Case PSA Results:\n")
+print(df_cea_ramsey)
+
+# Store Ramsey results in master table
+# Extract values for SoC and Bev arms
+ramsey_soc_row <- df_cea_ramsey[df_cea_ramsey$Strategy == "SoC", ]
+ramsey_bev_row <- df_cea_ramsey[df_cea_ramsey$Strategy == "Bev", ]
+
+df_age_band_psa_results <- rbind(df_age_band_psa_results, data.frame(
+ scenario = "Ramsey (base case)",
+ age_band = "N/A",
+ u_F_mean = u_F_ramsey,
+ u_P_mean = u_P_ramsey,
+ SoC_Cost = ramsey_soc_row$Cost,
+ SoC_QALY = ramsey_soc_row$Effect,
+ Bev_Cost = ramsey_bev_row$Cost,
+ Bev_QALY = ramsey_bev_row$Effect,
+ Inc_Cost = ramsey_bev_row$Inc_Cost,
+ Inc_QALY = ramsey_bev_row$Inc_Effect,
+ ICER = ramsey_bev_row$ICER,
+ stringsAsFactors = FALSE
+))
+
+# Store reference ICER for % change calculations
+ICER_ramsey_baseline <- ramsey_bev_row$ICER
+
+cat("\n  Ramsey baseline ICER: €", format(round(ICER_ramsey_baseline, 0), big.mark = ","), "/QALY\n", sep = "")
+
+#-------------------------------------------------------------------------------
+# SECTION D: LOOP OVER AGE BANDS
+#-------------------------------------------------------------------------------
+
+cat("\n")
+cat("========================================================================\n")
+cat("STARTING AGE-BAND SENSITIVITY ANALYSIS\n")
+cat("========================================================================\n")
+
+for (current_age_band in age_bands_to_test) {
+
+ cat("\n")
+ cat("------------------------------------------------------------------------\n")
+ cat("AGE BAND:", current_age_band, "\n")
+ cat("------------------------------------------------------------------------\n")
+
+ # D1: Get age_midpoint for this band (for function calls that need numeric age)
+ current_midpoint <- age_band_lookup$age_midpoint[age_band_lookup$age_band == current_age_band]
+ cat("  Age midpoint:", current_midpoint, "\n")
+
+ # D2: Get reference population norm (UK) for THIS age band
+ # --------------------------------------------------------
+ # This is the KEY change: U_ref varies by age band!
+ # Older age bands → Lower U_ref → Higher multipliers
+ U_ref_band <- df_popnorm$utility_norm[
+   df_popnorm$country == ref_country_for_multipliers &
+   df_popnorm$age_band == current_age_band
+ ]
+
+ if (length(U_ref_band) == 0) {
+   warning(paste0("No population norm found for ", ref_country_for_multipliers,
+                  " age band ", current_age_band, ". Skipping."))
+   next
+ }
+
+ cat("  U_ref (", ref_country_for_multipliers, ", ", current_age_band, "): ",
+     round(U_ref_band, 4), "\n", sep = "")
+
+ # D3: Recalculate multipliers for this age band
+ # ----------------------------------------------
+ # mean_PFS_mcrc and mean_PD_mcrc are FIXED (from mCRC literature)
+ # Only the denominator (U_ref) changes with age band
+ mult_PFS_band <- mean_PFS_mcrc / U_ref_band
+ mult_PD_band <- mean_PD_mcrc / U_ref_band
+
+ cat("  Multipliers for this age band:\n")
+ cat("    mult_PFS =", round(mean_PFS_mcrc, 4), "/", round(U_ref_band, 4),
+     "=", round(mult_PFS_band, 4), "\n")
+ cat("    mult_PD  =", round(mean_PD_mcrc, 4), "/", round(U_ref_band, 4),
+     "=", round(mult_PD_band, 4), "\n")
+
+ # D4: Calculate anchored utilities for ALL countries (for documentation)
+ # -----------------------------------------------------------------------
+ # This creates a comprehensive table showing how utilities vary across
+ # countries for this age band. Critical: ALL countries use SAME age band.
+
+ cat("\n  Anchored utilities for all countries (age band:", current_age_band, "):\n")
+
+ for (util_country in countries_for_utility_table) {
+   # Get population norm for this country × current age band
+   U_pop_country <- df_popnorm$utility_norm[
+     df_popnorm$country == util_country &
+     df_popnorm$age_band == current_age_band
+   ]
+
+   if (length(U_pop_country) == 0) {
+     cat("    ", util_country, ": No norm available\n")
+     next
+   }
+
+   # Calculate anchored utilities
+   u_PFS_anchored <- min(U_pop_country * mult_PFS_band, 1.0)  # Cap at 1.0
+   u_PD_anchored <- min(U_pop_country * mult_PD_band, 1.0)
+
+   cat("    ", util_country, ": U_pop=", round(U_pop_country, 3),
+       " → PFS=", round(u_PFS_anchored, 3),
+       ", PD=", round(u_PD_anchored, 3), "\n", sep = "")
+
+   # Store in utility table (PFS row)
+   df_age_band_utilities <- rbind(df_age_band_utilities, data.frame(
+     age_band = current_age_band,
+     country = util_country,
+     state_category = "PFS-like",
+     U_pop_norm = U_pop_country,
+     U_ref_band = U_ref_band,
+     multiplier = mult_PFS_band,
+     anchored_utility = u_PFS_anchored,
+     stringsAsFactors = FALSE
+   ))
+
+   # Store in utility table (PD row)
+   df_age_band_utilities <- rbind(df_age_band_utilities, data.frame(
+     age_band = current_age_band,
+     country = util_country,
+     state_category = "PD-like",
+     U_pop_norm = U_pop_country,
+     U_ref_band = U_ref_band,
+     multiplier = mult_PD_band,
+     anchored_utility = u_PD_anchored,
+     stringsAsFactors = FALSE
+   ))
+ }
+
+ # D5: Run PSA for the ANALYSIS COUNTRY (country_name) with this age band
+ # -----------------------------------------------------------------------
+ # Get anchored utilities for the current analysis country
+ U_pop_analysis <- df_popnorm$utility_norm[
+   df_popnorm$country == country_name &
+   df_popnorm$age_band == current_age_band
+ ]
+
+ # Handle Ireland: if not found, try with different name matching
+ if (length(U_pop_analysis) == 0 && country_name == "Ireland") {
+   # Ireland should be in the CSV; check for exact match
+   U_pop_analysis <- df_popnorm$utility_norm[
+     df_popnorm$country == "Ireland" &
+     df_popnorm$age_band == current_age_band
+   ]
+ }
+
+ if (length(U_pop_analysis) == 0) {
+   warning(paste0("No population norm found for ", country_name,
+                  " age band ", current_age_band, ". Using UK norm as fallback."))
+   U_pop_analysis <- U_ref_band
+ }
+
+ u_F_band <- min(U_pop_analysis * mult_PFS_band, 1.0)
+ u_P_band <- min(U_pop_analysis * mult_PD_band, 1.0)
+
+ cat("\n  PSA for", country_name, ":\n")
+ cat("    U_pop (", country_name, ", ", current_age_band, "): ",
+     round(U_pop_analysis, 4), "\n", sep = "")
+ cat("    u_F (anchored PFS): ", round(u_F_band, 4), "\n", sep = "")
+ cat("    u_P (anchored PD):  ", round(u_P_band, 4), "\n", sep = "")
+
+ # Regenerate beta distribution samples centered on anchored utilities
+ u_F_se_band <- (u_F_max_age - u_F_min_age) / (2 * 1.96)
+ u_F_alpha_plus_beta_band <- u_F_band * (1 - u_F_band) / (u_F_se_band^2) - 1
+ u_F_alpha_band <- u_F_band * u_F_alpha_plus_beta_band
+ u_F_beta_band <- u_F_alpha_band * (1 - u_F_band) / u_F_band
+
+ u_P_se_band <- (u_P_max_age - u_P_band) / 1.96
+ u_P_alpha_plus_beta_band <- u_P_band * (1 - u_P_band) / (u_P_se_band^2) - 1
+ u_P_alpha_band <- u_P_band * u_P_alpha_plus_beta_band
+ u_P_beta_band <- u_P_alpha_band * (1 - u_P_band) / u_P_band
+
+ set.seed(12345)  # Same seed for reproducibility across scenarios
+ u_F_samples_band <- rbeta(n_runs, shape1 = u_F_alpha_band, shape2 = u_F_beta_band)
+ u_P_samples_band <- rbeta(n_runs, shape1 = u_P_alpha_band, shape2 = u_P_beta_band)
+
+ # Update df_PA_input with new utility samples
+ df_PA_input$u_F <- u_F_samples_band
+ df_PA_input$u_P <- u_P_samples_band
+
+ cat("    Running PSA loop (", n_runs, " iterations)...\n", sep = "")
+
+ # Run PSA loop
+ df_c_band <- df_e_band <- data.frame(SoC = rep(NA, n_runs), Exp = rep(NA, n_runs))
+
+ for (i_run in 1:n_runs) {
+   l_out_temp <- oncologySemiMarkov(l_params_all = df_PA_input[i_run, ], n_wtp = n_wtp)
+   df_c_band[i_run, ] <- l_out_temp$Cost
+   df_e_band[i_run, ] <- l_out_temp$Effect
+   if (i_run / (n_runs / 10) == round(i_run / (n_runs / 10), 0)) {
+     cat('\r', paste("    ", i_run / n_runs * 100, "% done", sep = ""))
+   }
+ }
+ cat("\n")
+
+ # Create PSA object and calculate ICERs
+ l_PA_band <- make_psa_obj(
+   cost = df_c_band,
+   effectiveness = df_e_band,
+   parameters = df_PA_input,
+   strategies = c("SoC", "Bev"),
+   currency = "€"
+ )
+
+ df_out_ce_band <- summary(l_PA_band)
+ df_cea_band <- calculate_icers(
+   cost = df_out_ce_band$meanCost,
+   effect = df_out_ce_band$meanEffect,
+   strategies = df_out_ce_band$Strategy
+ )
+
+ cat("\n    PSA Results for age band", current_age_band, ":\n")
+ print(df_cea_band)
+
+ # D6: Store results and save outputs
+ # -----------------------------------
+ band_soc_row <- df_cea_band[df_cea_band$Strategy == "SoC", ]
+ band_bev_row <- df_cea_band[df_cea_band$Strategy == "Bev", ]
+
+ df_age_band_psa_results <- rbind(df_age_band_psa_results, data.frame(
+   scenario = paste0("Pop-norm adjusted (", current_age_band, ")"),
+   age_band = current_age_band,
+   u_F_mean = u_F_band,
+   u_P_mean = u_P_band,
+   SoC_Cost = band_soc_row$Cost,
+   SoC_QALY = band_soc_row$Effect,
+   Bev_Cost = band_bev_row$Cost,
+   Bev_QALY = band_bev_row$Effect,
+   Inc_Cost = band_bev_row$Inc_Cost,
+   Inc_QALY = band_bev_row$Inc_Effect,
+   ICER = band_bev_row$ICER,
+   stringsAsFactors = FALSE
+ ))
+
+ # Save scenario-specific ICER file
+ # Use underscore instead of special characters for filename safety
+ safe_band_name <- gsub("\\+", "plus", current_age_band)
+ output_filename_band <- paste0("Probabilistic_ICER_For_", country_name,
+                                "_age_band_", safe_band_name, ".csv")
+ write.csv(df_cea_band,
+           file = file.path("output", output_filename_band),
+           row_names = FALSE)
+ cat("    Saved:", output_filename_band, "\n")
+
+ # Save scatter plot for this age band
+ ce_scatter_band <- plot(l_PA_band, ylim = c(0, 200000))
+ plot_title_band <- paste("PSA Scatter Plot -", country_name, "- Age Band", current_age_band)
+ ce_scatter_band <- ce_scatter_band +
+   ggtitle(plot_title_band) +
+   theme(plot.title = element_text(hjust = 0.5))
+
+ scatter_filename_band <- paste0("CE_Scatter_Plot_", country_name,
+                                 "_age_band_", safe_band_name, ".png")
+ ggsave(file.path("output", scatter_filename_band),
+        plot = ce_scatter_band,
+        width = 8, height = 6, dpi = 300)
+ cat("    Saved:", scatter_filename_band, "\n")
+
+}  # End of age band loop
+
+#-------------------------------------------------------------------------------
+# SECTION E: GENERATE SUMMARY COMPARISON TABLE
+#-------------------------------------------------------------------------------
+
+cat("\n")
+cat("========================================================================\n")
+cat("AGE-BAND SENSITIVITY ANALYSIS: SUMMARY COMPARISON\n")
+cat("========================================================================\n\n")
+
+# E1: Add % change columns relative to Ramsey baseline
+df_age_band_psa_results$ICER_pct_change <- round(
+ (df_age_band_psa_results$ICER - ICER_ramsey_baseline) / ICER_ramsey_baseline * 100, 1
+)
+df_age_band_psa_results$Inc_QALY_pct_change <- round(
+ (df_age_band_psa_results$Inc_QALY - df_age_band_psa_results$Inc_QALY[1]) /
+   df_age_band_psa_results$Inc_QALY[1] * 100, 1
+)
+
+# E2: Round numeric columns for readability
+df_summary_display <- df_age_band_psa_results
+df_summary_display$u_F_mean <- round(df_summary_display$u_F_mean, 3)
+df_summary_display$u_P_mean <- round(df_summary_display$u_P_mean, 3)
+df_summary_display$SoC_Cost <- round(df_summary_display$SoC_Cost, 0)
+df_summary_display$SoC_QALY <- round(df_summary_display$SoC_QALY, 3)
+df_summary_display$Bev_Cost <- round(df_summary_display$Bev_Cost, 0)
+df_summary_display$Bev_QALY <- round(df_summary_display$Bev_QALY, 3)
+df_summary_display$Inc_Cost <- round(df_summary_display$Inc_Cost, 0)
+df_summary_display$Inc_QALY <- round(df_summary_display$Inc_QALY, 3)
+df_summary_display$ICER <- round(df_summary_display$ICER, 0)
+
+# E3: Print summary table
+cat("SUMMARY TABLE: PSA Results by Scenario\n")
+cat("---------------------------------------\n")
+cat("Country:", country_name, "\n")
+cat("WTP threshold: €", format(n_wtp, big.mark = ","), "/QALY\n\n", sep = "")
+
+print(df_summary_display)
+
+# E4: Print interpretation
+cat("\n")
+cat("INTERPRETATION:\n")
+cat("---------------\n")
+cat("As cohort age increases:\n")
+cat("  - Population norms DECREASE (older people have lower baseline utility)\n")
+cat("  - Anchored cancer utilities DECREASE proportionally\n")
+cat("  - QALYs in both arms DECREASE\n")
+cat("  - Incremental QALYs may change depending on relative utility differences\n")
+cat("  - ICER changes accordingly\n\n")
+
+cat("% Change in ICER relative to Ramsey base case:\n")
+for (i in 1:nrow(df_summary_display)) {
+ scenario_name <- df_summary_display$scenario[i]
+ pct_change <- df_summary_display$ICER_pct_change[i]
+ icer_value <- df_summary_display$ICER[i]
+
+ if (scenario_name == "Ramsey (base case)") {
+   cat("  ", scenario_name, ": €", format(icer_value, big.mark = ","),
+       "/QALY (REFERENCE)\n", sep = "")
+ } else {
+   direction <- ifelse(pct_change > 0, "↑", ifelse(pct_change < 0, "↓", "="))
+   cat("  ", scenario_name, ": €", format(icer_value, big.mark = ","),
+       "/QALY (", direction, " ", abs(pct_change), "% vs Ramsey)\n", sep = "")
+ }
+}
+
+# E5: Save summary files
+summary_filename <- paste0("Age_Band_PSA_Sensitivity_Summary_", country_name, ".csv")
+write.csv(df_age_band_psa_results,
+         file = file.path("output", summary_filename),
+         row.names = FALSE)
+cat("\n  Saved:", summary_filename, "\n")
+
+# E6: Save cross-country utility table
+utilities_filename <- "Age_Band_Utilities_All_Countries.csv"
+write.csv(df_age_band_utilities,
+         file = file.path("output", utilities_filename),
+         row.names = FALSE)
+cat("  Saved:", utilities_filename, "\n")
+
+# E7: Print cross-country utility table for transparency
+cat("\n")
+cat("CROSS-COUNTRY UTILITY TABLE (all age bands):\n")
+cat("---------------------------------------------\n")
+cat("This table shows anchored utilities for ALL countries across ALL age bands.\n")
+cat("Critical: Each row uses the SAME age band for the reference (UK) multiplier.\n\n")
+
+# Reshape for easier reading: wide format
+df_util_wide <- reshape(
+ df_age_band_utilities,
+ idvar = c("age_band", "country"),
+ timevar = "state_category",
+ direction = "wide"
+)
+names(df_util_wide) <- gsub("anchored_utility.", "u_", names(df_util_wide))
+names(df_util_wide) <- gsub("U_pop_norm.", "norm_", names(df_util_wide))
+names(df_util_wide) <- gsub("multiplier.", "mult_", names(df_util_wide))
+names(df_util_wide) <- gsub("U_ref_band.", "Uref_", names(df_util_wide))
+
+# Select key columns for display
+df_util_display <- df_util_wide[, c("age_band", "country",
+                                    "norm_PFS-like", "u_PFS-like", "u_PD-like")]
+names(df_util_display) <- c("Age Band", "Country", "Pop Norm", "u_PFS", "u_PD")
+df_util_display$`Pop Norm` <- round(df_util_display$`Pop Norm`, 3)
+df_util_display$u_PFS <- round(df_util_display$u_PFS, 3)
+df_util_display$u_PD <- round(df_util_display$u_PD, 3)
+
+print(df_util_display)
+
+#-------------------------------------------------------------------------------
+# SECTION F: RESTORE ORIGINAL VALUES AND CLEANUP
+#-------------------------------------------------------------------------------
+
+# Restore original df_PA_input u_F and u_P columns
+df_PA_input$u_F <- original_u_F_age
+df_PA_input$u_P <- original_u_P_age
+
+cat("\n")
+cat("================================================================================\n")
+cat("AGE-BAND PSA SENSITIVITY ANALYSIS COMPLETE\n")
+cat("================================================================================\n")
+cat("\n")
+cat("Output files generated:\n")
+cat("  Summary:\n")
+cat("    - ", summary_filename, "\n", sep = "")
+cat("    - ", utilities_filename, "\n", sep = "")
+cat("  Per age band:\n")
+for (band in age_bands_to_test) {
+ safe_band <- gsub("\\+", "plus", band)
+ cat("    - Probabilistic_ICER_For_", country_name, "_age_band_", safe_band, ".csv\n", sep = "")
+ cat("    - CE_Scatter_Plot_", country_name, "_age_band_", safe_band, ".png\n", sep = "")
+}
+cat("\n")
+
+```
+
+```{r}
 #09.3.2 Cost-Effectiveness Scatter plot
 
 # Incremental cost-effectiveness plane
