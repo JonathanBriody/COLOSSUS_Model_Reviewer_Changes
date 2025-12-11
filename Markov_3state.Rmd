@@ -12442,6 +12442,196 @@ write.csv(df_cea_PA, file = file.path("output", paste0("Probabilistic_ICER_For_"
 ```
 
 ```{r}
+#===============================================================================
+# 09.3.1.1 PSA FOR MULTIPLE UTILITY SCENARIOS
+#===============================================================================
+
+# CONTEXT: Extending PSA to run for both utility scenarios
+# ---------------------------------------------------------
+# The existing PSA (above) runs with whatever utility_scenario_main is set to.
+# This section runs PSA for BOTH utility scenarios:
+#   1. ramsey_basecase
+#   2. population_norm_adjusted
+#
+# This addresses reviewer concerns by demonstrating that conclusions are robust
+# to the choice of utility source (Ramsey vs population-norm adjusted).
+#
+# OUTPUT: Scenario-specific PSA files:
+#   - Probabilistic_ICER_For_<country>_ramsey_basecase.csv
+#   - Probabilistic_ICER_For_<country>_population_norm_adjusted.csv
+
+cat("\n")
+cat("================================================================================\n")
+cat("RUNNING PSA FOR MULTIPLE UTILITY SCENARIOS\n")
+cat("================================================================================\n")
+cat("\n")
+
+# Define utility scenarios to run
+psa_utility_scenarios <- c("ramsey_basecase", "population_norm_adjusted")
+
+# Store original df_PA_input u_F and u_P columns (to restore later if needed)
+original_u_F <- df_PA_input$u_F
+original_u_P <- df_PA_input$u_P
+
+# PSA utility ranges (same as used in original df_PA_input generation)
+# These define the min/max for beta distribution generation
+u_F_min <- 0.68
+u_F_max <- 1.00
+u_P_min <- 0.52
+u_P_max <- 0.78
+
+# Loop over utility scenarios
+for (psa_scen in psa_utility_scenarios) {
+
+  cat("\n")
+  cat("========================================================================\n")
+  cat("PSA SCENARIO:", psa_scen, "\n")
+  cat("Country:", country_name, "\n")
+  cat("========================================================================\n")
+
+  # STEP 1: Get utility values for this scenario
+  # ---------------------------------------------
+  utility_result_psa <- get_utility_scenario(
+    country = country_name,
+    age = model_age,
+    utility_scenario = psa_scen,
+    df_popnorm = df_popnorm
+  )
+
+  u_F_scen <- utility_result_psa$u_PFS
+  u_P_scen <- utility_result_psa$u_PD
+
+  cat("  u_PFS (mean for beta distribution):", round(u_F_scen, 4), "\n")
+  cat("  u_PD (mean for beta distribution): ", round(u_P_scen, 4), "\n")
+
+  # STEP 2: Regenerate beta distribution samples for u_F
+  # -----------------------------------------------------
+  # Using same methodology as original df_PA_input generation
+  # altbriggsse approach: SE = (max - min) / (2 * 1.96)
+
+  u_F_se <- (u_F_max - u_F_min) / (2 * 1.96)
+  u_F_alpha_plus_beta <- u_F_scen * (1 - u_F_scen) / (u_F_se^2) - 1
+  u_F_alpha_scen <- u_F_scen * u_F_alpha_plus_beta
+  u_F_beta_scen <- u_F_alpha_scen * (1 - u_F_scen) / u_F_scen
+
+  # Generate new beta samples
+  set.seed(12345)  # For reproducibility across scenarios
+  u_F_samples <- rbeta(n_runs, shape1 = u_F_alpha_scen, shape2 = u_F_beta_scen)
+
+  cat("  u_F beta params: alpha =", round(u_F_alpha_scen, 4),
+      ", beta =", round(u_F_beta_scen, 4), "\n")
+  cat("  u_F sample mean:", round(mean(u_F_samples), 4), "\n")
+
+  # STEP 3: Regenerate beta distribution samples for u_P
+  # -----------------------------------------------------
+  # Using briggsse approach: SE = (max - mean) / 1.96
+
+  u_P_se <- (u_P_max - u_P_scen) / 1.96
+  u_P_alpha_plus_beta <- u_P_scen * (1 - u_P_scen) / (u_P_se^2) - 1
+  u_P_alpha_scen <- u_P_scen * u_P_alpha_plus_beta
+  u_P_beta_scen <- u_P_alpha_scen * (1 - u_P_scen) / u_P_scen
+
+  # Generate new beta samples
+  u_P_samples <- rbeta(n_runs, shape1 = u_P_alpha_scen, shape2 = u_P_beta_scen)
+
+  cat("  u_P beta params: alpha =", round(u_P_alpha_scen, 4),
+      ", beta =", round(u_P_beta_scen, 4), "\n")
+  cat("  u_P sample mean:", round(mean(u_P_samples), 4), "\n")
+
+  # STEP 4: Update df_PA_input with new utility samples
+  # ----------------------------------------------------
+  df_PA_input$u_F <- u_F_samples
+  df_PA_input$u_P <- u_P_samples
+
+  # STEP 5: Run PSA loop with updated utilities
+  # --------------------------------------------
+  cat("\n  Running PSA loop (", n_runs, " iterations)...\n", sep = "")
+
+  # Create data frames to store scenario-specific results
+  df_c_scen <- df_e_scen <- data.frame(
+    SoC = rep(NA, n_runs),
+    Exp = rep(NA, n_runs)
+  )
+
+  # Run the PSA loop
+  for (i_run in 1:n_runs) {
+    # Evaluate model with updated utility parameters
+    l_out_temp <- oncologySemiMarkov(l_params_all = df_PA_input[i_run, ], n_wtp = n_wtp)
+    df_c_scen[i_run, ] <- l_out_temp$Cost
+    df_e_scen[i_run, ] <- l_out_temp$Effect
+
+    # Display progress every 10%
+    if (i_run / (n_runs / 10) == round(i_run / (n_runs / 10), 0)) {
+      cat('\r', paste("  ", i_run / n_runs * 100, "% done", sep = ""))
+    }
+  }
+  cat("\n")
+
+  # STEP 6: Create PSA object for this scenario
+  # --------------------------------------------
+  l_PA_scen <- make_psa_obj(
+    cost          = df_c_scen,
+    effectiveness = df_e_scen,
+    parameters    = df_PA_input,
+    strategies    = c("SoC", "Bev"),
+    currency      = "€"
+  )
+
+  # STEP 7: Calculate and save scenario-specific ICER
+  # --------------------------------------------------
+  df_out_ce_PA_scen <- summary(l_PA_scen)
+
+  df_cea_PA_scen <- calculate_icers(
+    cost       = df_out_ce_PA_scen$meanCost,
+    effect     = df_out_ce_PA_scen$meanEffect,
+    strategies = df_out_ce_PA_scen$Strategy
+  )
+
+  cat("\n  PSA Results for", psa_scen, ":\n")
+  print(df_cea_PA_scen)
+
+  # Save scenario-specific output
+  output_filename <- paste0("Probabilistic_ICER_For_", country_name, "_", psa_scen, ".csv")
+  write.csv(df_cea_PA_scen,
+            file = file.path("output", output_filename),
+            row.names = FALSE)
+  cat("\n  Saved:", output_filename, "\n")
+
+  # STEP 8: Save scenario-specific scatter plot
+  # --------------------------------------------
+  ce_scatter_scen <- plot(l_PA_scen, ylim = c(0, 200000))
+  plot_title_scen <- paste("PSA Scatter Plot -", country_name, "-", psa_scen)
+  ce_scatter_scen <- ce_scatter_scen +
+    ggtitle(plot_title_scen) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+  scatter_filename <- paste0("CE_Scatter_Plot_", country_name, "_", psa_scen, ".png")
+  ggsave(file.path("output", scatter_filename),
+         plot = ce_scatter_scen,
+         width = 8, height = 6, dpi = 300)
+  cat("  Saved:", scatter_filename, "\n")
+
+}  # End of utility scenario loop
+
+# Restore original df_PA_input u_F and u_P columns
+df_PA_input$u_F <- original_u_F
+df_PA_input$u_P <- original_u_P
+
+cat("\n")
+cat("================================================================================\n")
+cat("PSA UTILITY SCENARIO ANALYSIS COMPLETE\n")
+cat("================================================================================\n")
+cat("\n")
+cat("Output files generated for each scenario:\n")
+for (psa_scen in psa_utility_scenarios) {
+  cat("  - Probabilistic_ICER_For_", country_name, "_", psa_scen, ".csv\n", sep = "")
+  cat("  - CE_Scatter_Plot_", country_name, "_", psa_scen, ".png\n", sep = "")
+}
+cat("\n")
+
+```
+
+```{r}
 #09.3.2 Cost-Effectiveness Scatter plot
 
 # Incremental cost-effectiveness plane
