@@ -13376,36 +13376,31 @@ cat("Running PSA with RAISE/VELOUR P_OSD values...\n")
 df_PA_input$P_OSD_SoC <- P_OSD_RAISE_VELOUR_samples
 df_PA_input$P_OSD_Exp <- P_OSD_RAISE_VELOUR_samples
 
-# Initialize results matrices
-m_costs_raise_velour <- matrix(NA, nrow = n_runs, ncol = 2)
-colnames(m_costs_raise_velour) <- c("SoC", "Experimental")
-m_effects_raise_velour <- matrix(NA, nrow = n_runs, ncol = 2)
-colnames(m_effects_raise_velour) <- c("SoC", "Experimental")
+# Initialize results dataframes (matching the structure used in age-band PSA)
+# oncologySemiMarkov returns a dataframe with Cost and Effect columns, each containing
+# two values: [SoC, Exp]
+df_c_rv <- df_e_rv <- data.frame(SoC = rep(NA, n_runs), Exp = rep(NA, n_runs))
 
 # Run PSA loop
-pb <- txtProgressBar(min = 0, max = n_runs, style = 3)
-for (i in 1:n_runs) {
-  l_params_temp <- as.list(df_PA_input[i, ])
-  res_temp <- oncologySemiMarkov(l_params_all = l_params_temp, n_wtp = n_wtp)
-
-  m_costs_raise_velour[i, "SoC"] <- res_temp$tc_SoC
-  m_costs_raise_velour[i, "Experimental"] <- res_temp$tc_Exp
-  m_effects_raise_velour[i, "SoC"] <- res_temp$te_SoC
-  m_effects_raise_velour[i, "Experimental"] <- res_temp$te_Exp
-
-  setTxtProgressBar(pb, i)
+for (i_run in 1:n_runs) {
+  l_out_temp <- oncologySemiMarkov(l_params_all = df_PA_input[i_run, ], n_wtp = n_wtp)
+  df_c_rv[i_run, ] <- l_out_temp$Cost
+  df_e_rv[i_run, ] <- l_out_temp$Effect
+  if (i_run / (n_runs / 10) == round(i_run / (n_runs / 10), 0)) {
+    cat('\r', paste(i_run / n_runs * 100, "% done", sep = ""))
+  }
 }
-close(pb)
+cat("\n")
 
-cat("\nPSA with RAISE/VELOUR P_OSD complete.\n\n")
+cat("PSA with RAISE/VELOUR P_OSD complete.\n\n")
 
 #-------------------------------------------------------------------------------
 # SECTION E: CALCULATE RESULTS AND COMPARE TO WEN ET AL. BASE CASE
 #-------------------------------------------------------------------------------
 
 # RAISE/VELOUR results
-inc_cost_raise_velour <- m_costs_raise_velour[, "Experimental"] - m_costs_raise_velour[, "SoC"]
-inc_qaly_raise_velour <- m_effects_raise_velour[, "Experimental"] - m_effects_raise_velour[, "SoC"]
+inc_cost_raise_velour <- df_c_rv$Exp - df_c_rv$SoC
+inc_qaly_raise_velour <- df_e_rv$Exp - df_e_rv$SoC
 icer_samples_raise_velour <- inc_cost_raise_velour / inc_qaly_raise_velour
 nmb_raise_velour <- inc_qaly_raise_velour * n_wtp - inc_cost_raise_velour
 
@@ -13486,10 +13481,10 @@ cat("Saved: output/", posd_summary_filename, "\n", sep = "")
 df_posd_detailed <- data.frame(
   Run = 1:n_runs,
   P_OSD_sampled = P_OSD_RAISE_VELOUR_samples,
-  Cost_SoC = m_costs_raise_velour[, "SoC"],
-  Cost_Exp = m_costs_raise_velour[, "Experimental"],
-  QALY_SoC = m_effects_raise_velour[, "SoC"],
-  QALY_Exp = m_effects_raise_velour[, "Experimental"],
+  Cost_SoC = df_c_rv$SoC,
+  Cost_Exp = df_c_rv$Exp,
+  QALY_SoC = df_e_rv$SoC,
+  QALY_Exp = df_e_rv$Exp,
   Inc_Cost = inc_cost_raise_velour,
   Inc_QALY = inc_qaly_raise_velour,
   ICER = icer_samples_raise_velour,
