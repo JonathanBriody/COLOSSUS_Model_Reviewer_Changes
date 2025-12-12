@@ -13232,6 +13232,324 @@ cat("\n")
 ```
 
 ```{r}
+#===============================================================================
+# 09.3.1.3 RAISE/VELOUR P_OSD Sensitivity Analysis
+#===============================================================================
+#
+# PURPOSE:
+# This sensitivity analysis addresses reviewer concerns about the base-case
+# transition probability from progressed disease (second-line) to death (P_OSD).
+#
+# BASE CASE (Wen et al. 2016):
+#   - P_OSD = 0.17 (range 0.12-0.22) per 14-day cycle
+#   - Source: Advanced gastric adenocarcinoma (different cancer type)
+#   - Implied median OS in progressed state: ~2.7 months
+#
+# SENSITIVITY ANALYSIS (RAISE/VELOUR trials):
+#   - RAISE trial (placebo + FOLFIRI): Median OS = 11.7 mo (95% CI: 10.8-12.7)
+#   - VELOUR trial (placebo + FOLFIRI): Median OS = 12.06 mo (95% CI: 11.07-13.11)
+#   - Combined average: Median OS = 11.88 months
+#   - Converted P_OSD = 0.0265 (range 0.024-0.029) per 14-day cycle
+#   - Sources: mCRC-specific, FOLFIRI control arms (directly applicable)
+#
+# REFERENCES:
+#   - Tabernero et al. (2015) Lancet Oncology - RAISE trial
+#   - Folprecht et al. (2014) European Journal of Cancer - VELOUR trial
+#
+# This analysis runs PSA with RAISE/VELOUR-derived P_OSD values and compares
+# results to the Wen et al. base case.
+#===============================================================================
+
+cat("\n")
+cat("================================================================================\n")
+cat("RAISE/VELOUR P_OSD SENSITIVITY ANALYSIS\n")
+cat("================================================================================\n")
+cat("\n")
+cat("Testing alternative transition probability from progressed disease to death\n")
+cat("based on mCRC-specific data from RAISE and VELOUR trials.\n\n")
+
+#-------------------------------------------------------------------------------
+# SECTION A: DEFINE RAISE/VELOUR PARAMETERS
+#-------------------------------------------------------------------------------
+
+# Trial data (placebo + FOLFIRI control arms):
+# RAISE: Median OS = 11.7 months (95% CI: 10.8-12.7)
+# VELOUR: Median OS = 12.06 months (95% CI: 11.07-13.11)
+
+# Combined estimate:
+median_os_raise <- 11.7    # months
+median_os_velour <- 12.06  # months
+median_os_combined <- (median_os_raise + median_os_velour) / 2  # 11.88 months
+
+# Range from CIs (use outer bounds):
+median_os_min <- 10.8   # Lower bound (RAISE CI lower)
+median_os_max <- 13.11  # Upper bound (VELOUR CI upper)
+
+# Convert median OS (months) to per-cycle P_OSD (14-day cycles)
+# Formula: P_OSD = 1 - exp(-ln(2) / cycles)
+# where cycles = median_months * (365/12) / 14
+
+convert_median_to_posd <- function(median_months) {
+  cycles <- median_months * (365/12) / 14
+  p_osd <- 1 - exp(-log(2) / cycles)
+  return(p_osd)
+}
+
+# Calculate P_OSD values
+P_OSD_RAISE_VELOUR_mean <- convert_median_to_posd(median_os_combined)
+P_OSD_RAISE_VELOUR_min <- convert_median_to_posd(median_os_max)  # Longer survival = lower P_OSD
+P_OSD_RAISE_VELOUR_max <- convert_median_to_posd(median_os_min)  # Shorter survival = higher P_OSD
+
+cat("RAISE/VELOUR Combined Parameters:\n")
+cat("  Combined median OS: ", round(median_os_combined, 2), " months\n", sep = "")
+cat("  Median OS range: ", median_os_min, " - ", median_os_max, " months\n", sep = "")
+cat("  P_OSD (mean): ", round(P_OSD_RAISE_VELOUR_mean, 4), "\n", sep = "")
+cat("  P_OSD range: ", round(P_OSD_RAISE_VELOUR_min, 4), " - ",
+    round(P_OSD_RAISE_VELOUR_max, 4), "\n", sep = "")
+cat("\n")
+
+cat("Comparison to Wen et al. base case:\n")
+cat("  Wen et al. P_OSD: 0.17 (range 0.12-0.22)\n")
+cat("  RAISE/VELOUR P_OSD: ", round(P_OSD_RAISE_VELOUR_mean, 4),
+    " (range ", round(P_OSD_RAISE_VELOUR_min, 4), "-",
+    round(P_OSD_RAISE_VELOUR_max, 4), ")\n", sep = "")
+cat("  Ratio: RAISE/VELOUR is ", round(P_OSD_RAISE_VELOUR_mean / 0.17, 1),
+    "x lower than Wen et al.\n", sep = "")
+cat("  Implication: Patients survive ~", round(0.17 / P_OSD_RAISE_VELOUR_mean, 1),
+    "x longer in progressed state\n", sep = "")
+cat("\n")
+
+#-------------------------------------------------------------------------------
+# SECTION B: CALCULATE BETA DISTRIBUTION PARAMETERS FOR RAISE/VELOUR P_OSD
+#-------------------------------------------------------------------------------
+
+# Using same approach as original PSA (Briggs method)
+# Range is not perfectly centered, so use altbriggsse approach
+
+posd_max <- P_OSD_RAISE_VELOUR_max
+posd_min <- P_OSD_RAISE_VELOUR_min
+posd_mean <- P_OSD_RAISE_VELOUR_mean
+
+# Calculate SE using range (not perfectly centered)
+posd_altbriggsse <- (posd_max - posd_min) / (2 * 1.96)
+
+# Generate alpha and beta for beta distribution
+posd_std_error <- posd_altbriggsse
+posd_alpha_plus_beta <- posd_mean * (1 - posd_mean) / (posd_std_error^2) - 1
+posd_alpha <- posd_mean * posd_alpha_plus_beta
+posd_beta <- posd_alpha * (1 - posd_mean) / posd_mean
+
+cat("Beta distribution parameters for RAISE/VELOUR P_OSD:\n")
+cat("  Alpha: ", round(posd_alpha, 2), "\n", sep = "")
+cat("  Beta: ", round(posd_beta, 2), "\n", sep = "")
+cat("  Expected mean: ", round(posd_alpha / (posd_alpha + posd_beta), 4), "\n", sep = "")
+cat("\n")
+
+#-------------------------------------------------------------------------------
+# SECTION C: STORE ORIGINAL P_OSD VALUES AND GENERATE RAISE/VELOUR SAMPLES
+#-------------------------------------------------------------------------------
+
+# Store original P_OSD samples from df_PA_input
+original_P_OSD_SoC <- df_PA_input$P_OSD_SoC
+original_P_OSD_Exp <- df_PA_input$P_OSD_Exp
+
+# Generate RAISE/VELOUR P_OSD samples using same seed as original PSA
+set.seed(123)
+P_OSD_RAISE_VELOUR_samples <- rbeta(n_runs, shape1 = posd_alpha, shape2 = posd_beta)
+
+cat("RAISE/VELOUR P_OSD sample statistics (n = ", n_runs, "):\n", sep = "")
+cat("  Mean: ", round(mean(P_OSD_RAISE_VELOUR_samples), 4), "\n", sep = "")
+cat("  SD: ", round(sd(P_OSD_RAISE_VELOUR_samples), 4), "\n", sep = "")
+cat("  Min: ", round(min(P_OSD_RAISE_VELOUR_samples), 4), "\n", sep = "")
+cat("  Max: ", round(max(P_OSD_RAISE_VELOUR_samples), 4), "\n", sep = "")
+cat("  2.5%: ", round(quantile(P_OSD_RAISE_VELOUR_samples, 0.025), 4), "\n", sep = "")
+cat("  97.5%: ", round(quantile(P_OSD_RAISE_VELOUR_samples, 0.975), 4), "\n", sep = "")
+cat("\n")
+
+#-------------------------------------------------------------------------------
+# SECTION D: RUN PSA WITH RAISE/VELOUR P_OSD VALUES
+#-------------------------------------------------------------------------------
+
+cat("Running PSA with RAISE/VELOUR P_OSD values...\n")
+
+# Override P_OSD values in df_PA_input
+df_PA_input$P_OSD_SoC <- P_OSD_RAISE_VELOUR_samples
+df_PA_input$P_OSD_Exp <- P_OSD_RAISE_VELOUR_samples
+
+# Initialize results matrices
+m_costs_raise_velour <- matrix(NA, nrow = n_runs, ncol = 2)
+colnames(m_costs_raise_velour) <- c("SoC", "Experimental")
+m_effects_raise_velour <- matrix(NA, nrow = n_runs, ncol = 2)
+colnames(m_effects_raise_velour) <- c("SoC", "Experimental")
+
+# Run PSA loop
+pb <- txtProgressBar(min = 0, max = n_runs, style = 3)
+for (i in 1:n_runs) {
+  l_params_temp <- as.list(df_PA_input[i, ])
+  res_temp <- oncologySemiMarkov(l_params_all = l_params_temp, n_wtp = n_wtp)
+
+  m_costs_raise_velour[i, "SoC"] <- res_temp$tc_SoC
+  m_costs_raise_velour[i, "Experimental"] <- res_temp$tc_Exp
+  m_effects_raise_velour[i, "SoC"] <- res_temp$te_SoC
+  m_effects_raise_velour[i, "Experimental"] <- res_temp$te_Exp
+
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+
+cat("\nPSA with RAISE/VELOUR P_OSD complete.\n\n")
+
+#-------------------------------------------------------------------------------
+# SECTION E: CALCULATE RESULTS AND COMPARE TO WEN ET AL. BASE CASE
+#-------------------------------------------------------------------------------
+
+# RAISE/VELOUR results
+inc_cost_raise_velour <- m_costs_raise_velour[, "Experimental"] - m_costs_raise_velour[, "SoC"]
+inc_qaly_raise_velour <- m_effects_raise_velour[, "Experimental"] - m_effects_raise_velour[, "SoC"]
+icer_samples_raise_velour <- inc_cost_raise_velour / inc_qaly_raise_velour
+nmb_raise_velour <- inc_qaly_raise_velour * n_wtp - inc_cost_raise_velour
+
+mean_inc_cost_rv <- mean(inc_cost_raise_velour)
+mean_inc_qaly_rv <- mean(inc_qaly_raise_velour)
+mean_icer_rv <- mean_inc_cost_rv / mean_inc_qaly_rv
+mean_nmb_rv <- mean(nmb_raise_velour)
+
+# Get Wen et al. base case results from original PSA (l_PA object)
+# These were calculated in the main PSA section
+mean_inc_cost_wen <- mean(l_PA$cost[, "Experimental"] - l_PA$cost[, "SoC"])
+mean_inc_qaly_wen <- mean(l_PA$effectiveness[, "Experimental"] - l_PA$effectiveness[, "SoC"])
+mean_icer_wen <- mean_inc_cost_wen / mean_inc_qaly_wen
+nmb_wen <- (l_PA$effectiveness[, "Experimental"] - l_PA$effectiveness[, "SoC"]) * n_wtp -
+           (l_PA$cost[, "Experimental"] - l_PA$cost[, "SoC"])
+mean_nmb_wen <- mean(nmb_wen)
+
+# Calculate percentage changes
+pct_change_cost <- (mean_inc_cost_rv - mean_inc_cost_wen) / abs(mean_inc_cost_wen) * 100
+pct_change_qaly <- (mean_inc_qaly_rv - mean_inc_qaly_wen) / abs(mean_inc_qaly_wen) * 100
+pct_change_icer <- (mean_icer_rv - mean_icer_wen) / abs(mean_icer_wen) * 100
+pct_change_nmb <- (mean_nmb_rv - mean_nmb_wen) / abs(mean_nmb_wen) * 100
+
+cat("================================================================================\n")
+cat("RAISE/VELOUR P_OSD SENSITIVITY ANALYSIS RESULTS\n")
+cat("================================================================================\n")
+cat("\n")
+
+cat("Scenario Comparison:\n")
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("%-35s %15s %15s %12s\n", "Metric", "Wen et al.", "RAISE/VELOUR", "% Change"))
+cat("--------------------------------------------------------------------------------\n")
+cat(sprintf("%-35s %15.4f %15.4f %12s\n", "P_OSD (per cycle)", 0.17, P_OSD_RAISE_VELOUR_mean,
+            paste0(round((P_OSD_RAISE_VELOUR_mean - 0.17) / 0.17 * 100, 1), "%")))
+cat(sprintf("%-35s %15.2f %15.2f %12s\n", "Mean Incremental Cost", mean_inc_cost_wen, mean_inc_cost_rv,
+            paste0(ifelse(pct_change_cost >= 0, "+", ""), round(pct_change_cost, 1), "%")))
+cat(sprintf("%-35s %15.4f %15.4f %12s\n", "Mean Incremental QALY", mean_inc_qaly_wen, mean_inc_qaly_rv,
+            paste0(ifelse(pct_change_qaly >= 0, "+", ""), round(pct_change_qaly, 1), "%")))
+cat(sprintf("%-35s %15.2f %15.2f %12s\n", "ICER", mean_icer_wen, mean_icer_rv,
+            paste0(ifelse(pct_change_icer >= 0, "+", ""), round(pct_change_icer, 1), "%")))
+cat(sprintf("%-35s %15.2f %15.2f %12s\n", "Mean NMB", mean_nmb_wen, mean_nmb_rv,
+            paste0(ifelse(pct_change_nmb >= 0, "+", ""), round(pct_change_nmb, 1), "%")))
+cat("--------------------------------------------------------------------------------\n")
+cat("\n")
+
+cat("Interpretation:\n")
+cat("  Using mCRC-specific RAISE/VELOUR data (median OS ~12 months in second-line)\n")
+cat("  instead of Wen et al. gastric cancer data (implied median OS ~2.7 months)\n")
+cat("  results in patients surviving longer in the progressed disease state.\n")
+cat("  This affects both QALYs (more time at lower utility) and costs (more cycles\n")
+cat("  of second-line treatment).\n")
+cat("\n")
+
+#-------------------------------------------------------------------------------
+# SECTION F: SAVE OUTPUT FILES
+#-------------------------------------------------------------------------------
+
+# Create summary dataframe
+df_posd_summary <- data.frame(
+  Scenario = c("Wen et al. (Base Case)", "RAISE/VELOUR (Sensitivity)"),
+  Source = c("Gastric adenocarcinoma", "mCRC (FOLFIRI control arms)"),
+  Median_OS_months = c("~2.7 (implied)", "11.88"),
+  P_OSD_mean = c(0.17, round(P_OSD_RAISE_VELOUR_mean, 4)),
+  P_OSD_range = c("0.12-0.22", paste0(round(P_OSD_RAISE_VELOUR_min, 4), "-", round(P_OSD_RAISE_VELOUR_max, 4))),
+  Mean_Inc_Cost = c(round(mean_inc_cost_wen, 2), round(mean_inc_cost_rv, 2)),
+  Mean_Inc_QALY = c(round(mean_inc_qaly_wen, 4), round(mean_inc_qaly_rv, 4)),
+  ICER = c(round(mean_icer_wen, 2), round(mean_icer_rv, 2)),
+  Mean_NMB = c(round(mean_nmb_wen, 2), round(mean_nmb_rv, 2)),
+  ICER_Pct_Change = c("-", paste0(ifelse(pct_change_icer >= 0, "+", ""), round(pct_change_icer, 1), "%"))
+)
+
+# Save summary CSV
+posd_summary_filename <- paste0("P_OSD_RAISE_VELOUR_Sensitivity_", country_name, ".csv")
+write.csv(df_posd_summary, file.path("output", posd_summary_filename), row.names = FALSE)
+cat("Saved: output/", posd_summary_filename, "\n", sep = "")
+
+# Save detailed RAISE/VELOUR PSA results
+df_posd_detailed <- data.frame(
+  Run = 1:n_runs,
+  P_OSD_sampled = P_OSD_RAISE_VELOUR_samples,
+  Cost_SoC = m_costs_raise_velour[, "SoC"],
+  Cost_Exp = m_costs_raise_velour[, "Experimental"],
+  QALY_SoC = m_effects_raise_velour[, "SoC"],
+  QALY_Exp = m_effects_raise_velour[, "Experimental"],
+  Inc_Cost = inc_cost_raise_velour,
+  Inc_QALY = inc_qaly_raise_velour,
+  ICER = icer_samples_raise_velour,
+  NMB = nmb_raise_velour
+)
+
+posd_detailed_filename <- paste0("Probabilistic_ICER_For_", country_name, "_RAISE_VELOUR.csv")
+write.csv(df_posd_detailed, file.path("output", posd_detailed_filename), row.names = FALSE)
+cat("Saved: output/", posd_detailed_filename, "\n", sep = "")
+
+# Generate scatter plot for RAISE/VELOUR scenario
+png(file.path("output", paste0("CE_Scatter_Plot_", country_name, "_RAISE_VELOUR.png")),
+    width = 8, height = 6, units = "in", res = 300)
+
+plot(inc_qaly_raise_velour, inc_cost_raise_velour,
+     pch = 20, col = rgb(0, 0.4, 0.8, 0.3), cex = 0.5,
+     xlab = "Incremental QALYs", ylab = "Incremental Cost",
+     main = paste0("Cost-Effectiveness Plane - ", country_name, " (RAISE/VELOUR P_OSD)"))
+abline(h = 0, lty = 2, col = "gray50")
+abline(v = 0, lty = 2, col = "gray50")
+abline(a = 0, b = n_wtp, lty = 2, col = "red")
+
+# Add mean point
+points(mean_inc_qaly_rv, mean_inc_cost_rv, pch = 18, col = "red", cex = 2)
+
+# Add legend
+legend("topleft",
+       legend = c("PSA iterations", "Mean", paste0("WTP = €", format(n_wtp, big.mark = ","))),
+       pch = c(20, 18, NA), lty = c(NA, NA, 2),
+       col = c(rgb(0, 0.4, 0.8, 0.7), "red", "red"),
+       bg = "white")
+
+dev.off()
+cat("Saved: output/CE_Scatter_Plot_", country_name, "_RAISE_VELOUR.png\n", sep = "")
+
+#-------------------------------------------------------------------------------
+# SECTION G: RESTORE ORIGINAL P_OSD VALUES
+#-------------------------------------------------------------------------------
+
+df_PA_input$P_OSD_SoC <- original_P_OSD_SoC
+df_PA_input$P_OSD_Exp <- original_P_OSD_Exp
+
+cat("\n")
+cat("================================================================================\n")
+cat("RAISE/VELOUR P_OSD SENSITIVITY ANALYSIS COMPLETE\n")
+cat("================================================================================\n")
+cat("\n")
+cat("This analysis demonstrates the impact of using mCRC-specific transition\n")
+cat("probabilities from the RAISE and VELOUR trials instead of the base-case\n")
+cat("value from Wen et al. (gastric adenocarcinoma).\n")
+cat("\n")
+cat("Output files generated:\n")
+cat("  - ", posd_summary_filename, " (summary comparison)\n", sep = "")
+cat("  - ", posd_detailed_filename, " (detailed PSA results)\n", sep = "")
+cat("  - CE_Scatter_Plot_", country_name, "_RAISE_VELOUR.png (CE plane)\n", sep = "")
+cat("\n")
+
+```
+
+```{r}
 #09.3.2 Cost-Effectiveness Scatter plot
 
 # Incremental cost-effectiveness plane
