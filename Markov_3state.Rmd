@@ -12504,46 +12504,55 @@ for (psa_scen in psa_utility_scenarios) {
   cat("  u_PFS (mean for beta distribution):", round(u_F_scen, 4), "\n")
   cat("  u_PD (mean for beta distribution): ", round(u_P_scen, 4), "\n")
 
-  # STEP 2: Regenerate beta distribution samples for u_F
-  # -----------------------------------------------------
-  # Using same methodology as original df_PA_input generation
-  # altbriggsse approach: SE = (max - min) / (2 * 1.96)
+  # STEP 2-4: Handle utility samples based on scenario
+  # ---------------------------------------------------
+  # CRITICAL FIX: For Ramsey base case, use the ORIGINAL df_PA_input samples
+  # to ensure ICER matches the main PSA exactly. Only regenerate for non-Ramsey.
 
-  u_F_se <- (u_F_max - u_F_min) / (2 * 1.96)
-  u_F_alpha_plus_beta <- u_F_scen * (1 - u_F_scen) / (u_F_se^2) - 1
-  u_F_alpha_scen <- u_F_scen * u_F_alpha_plus_beta
-  u_F_beta_scen <- u_F_alpha_scen * (1 - u_F_scen) / u_F_scen
+  if (psa_scen == "ramsey_basecase") {
+    # USE ORIGINAL SAMPLES - no regeneration needed
+    # This ensures Ramsey ICER here matches Probabilistic_ICER_For_Ireland exactly
+    cat("  Using ORIGINAL df_PA_input samples (no regeneration)\n")
+    cat("  u_F sample mean:", round(mean(original_u_F), 4), "\n")
+    cat("  u_P sample mean:", round(mean(original_u_P), 4), "\n")
+    df_PA_input$u_F <- original_u_F
+    df_PA_input$u_P <- original_u_P
 
-  # Generate new beta samples
-  # IMPORTANT: Use seed 123 to match the original PSA sampling sequence
-  # This ensures consistency with the main PSA results when comparing scenarios
-  set.seed(123)
-  u_F_samples <- rbeta(n_runs, shape1 = u_F_alpha_scen, shape2 = u_F_beta_scen)
+  } else {
+    # REGENERATE SAMPLES for non-Ramsey scenarios (population_norm_adjusted, etc.)
+    # Using same methodology as original df_PA_input generation
 
-  cat("  u_F beta params: alpha =", round(u_F_alpha_scen, 4),
-      ", beta =", round(u_F_beta_scen, 4), "\n")
-  cat("  u_F sample mean:", round(mean(u_F_samples), 4), "\n")
+    # u_F: altbriggsse approach: SE = (max - min) / (2 * 1.96)
+    u_F_se <- (u_F_max - u_F_min) / (2 * 1.96)
+    u_F_alpha_plus_beta <- u_F_scen * (1 - u_F_scen) / (u_F_se^2) - 1
+    u_F_alpha_scen <- u_F_scen * u_F_alpha_plus_beta
+    u_F_beta_scen <- u_F_alpha_scen * (1 - u_F_scen) / u_F_scen
 
-  # STEP 3: Regenerate beta distribution samples for u_P
-  # -----------------------------------------------------
-  # Using briggsse approach: SE = (max - mean) / 1.96
+    # Generate new beta samples with seed 123 for reproducibility
+    set.seed(123)
+    u_F_samples <- rbeta(n_runs, shape1 = u_F_alpha_scen, shape2 = u_F_beta_scen)
 
-  u_P_se <- (u_P_max - u_P_scen) / 1.96
-  u_P_alpha_plus_beta <- u_P_scen * (1 - u_P_scen) / (u_P_se^2) - 1
-  u_P_alpha_scen <- u_P_scen * u_P_alpha_plus_beta
-  u_P_beta_scen <- u_P_alpha_scen * (1 - u_P_scen) / u_P_scen
+    cat("  u_F beta params: alpha =", round(u_F_alpha_scen, 4),
+        ", beta =", round(u_F_beta_scen, 4), "\n")
+    cat("  u_F sample mean:", round(mean(u_F_samples), 4), "\n")
 
-  # Generate new beta samples
-  u_P_samples <- rbeta(n_runs, shape1 = u_P_alpha_scen, shape2 = u_P_beta_scen)
+    # u_P: briggsse approach: SE = (max - mean) / 1.96
+    u_P_se <- (u_P_max - u_P_scen) / 1.96
+    u_P_alpha_plus_beta <- u_P_scen * (1 - u_P_scen) / (u_P_se^2) - 1
+    u_P_alpha_scen <- u_P_scen * u_P_alpha_plus_beta
+    u_P_beta_scen <- u_P_alpha_scen * (1 - u_P_scen) / u_P_scen
 
-  cat("  u_P beta params: alpha =", round(u_P_alpha_scen, 4),
-      ", beta =", round(u_P_beta_scen, 4), "\n")
-  cat("  u_P sample mean:", round(mean(u_P_samples), 4), "\n")
+    # Generate new beta samples (continues from same seed)
+    u_P_samples <- rbeta(n_runs, shape1 = u_P_alpha_scen, shape2 = u_P_beta_scen)
 
-  # STEP 4: Update df_PA_input with new utility samples
-  # ----------------------------------------------------
-  df_PA_input$u_F <- u_F_samples
-  df_PA_input$u_P <- u_P_samples
+    cat("  u_P beta params: alpha =", round(u_P_alpha_scen, 4),
+        ", beta =", round(u_P_beta_scen, 4), "\n")
+    cat("  u_P sample mean:", round(mean(u_P_samples), 4), "\n")
+
+    # Update df_PA_input with new utility samples
+    df_PA_input$u_F <- u_F_samples
+    df_PA_input$u_P <- u_P_samples
+  }
 
   # STEP 5: Run PSA loop with updated utilities
   # --------------------------------------------
@@ -12778,28 +12787,22 @@ cat("========================================================================\n\
 u_F_ramsey <- 0.85
 u_P_ramsey <- 0.65
 
-# Regenerate beta distribution samples for Ramsey utilities
-u_F_se_ramsey <- (u_F_max_age - u_F_min_age) / (2 * 1.96)
-u_F_alpha_plus_beta_ramsey <- u_F_ramsey * (1 - u_F_ramsey) / (u_F_se_ramsey^2) - 1
-u_F_alpha_ramsey <- u_F_ramsey * u_F_alpha_plus_beta_ramsey
-u_F_beta_ramsey <- u_F_alpha_ramsey * (1 - u_F_ramsey) / u_F_ramsey
+# CRITICAL FIX: Use ORIGINAL df_PA_input samples instead of regenerating
+# -----------------------------------------------------------------------
+# This ensures the Ramsey ICER here matches Probabilistic_ICER_For_Ireland EXACTLY.
+# The original samples were generated at a specific point in the RNG sequence after
+# seed 123, so regenerating with set.seed(123) produces different draws.
+#
+# original_u_F_age and original_u_P_age were saved at the start of this chunk
+# and contain the exact samples used in the main PSA.
 
-u_P_se_ramsey <- (u_P_max_age - u_P_ramsey) / 1.96
-u_P_alpha_plus_beta_ramsey <- u_P_ramsey * (1 - u_P_ramsey) / (u_P_se_ramsey^2) - 1
-u_P_alpha_ramsey <- u_P_ramsey * u_P_alpha_plus_beta_ramsey
-u_P_beta_ramsey <- u_P_alpha_ramsey * (1 - u_P_ramsey) / u_P_ramsey
+cat("  Using ORIGINAL df_PA_input samples (no regeneration)\n")
+cat("  u_F (Ramsey PFS) mean:", round(mean(original_u_F_age), 4), "\n")
+cat("  u_P (Ramsey PD) mean: ", round(mean(original_u_P_age), 4), "\n")
 
-# IMPORTANT: Use seed 123 to match the original PSA sampling sequence
-# This ensures the Ramsey baseline here matches the main PSA exactly
-set.seed(123)
-u_F_samples_ramsey <- rbeta(n_runs, shape1 = u_F_alpha_ramsey, shape2 = u_F_beta_ramsey)
-u_P_samples_ramsey <- rbeta(n_runs, shape1 = u_P_alpha_ramsey, shape2 = u_P_beta_ramsey)
+df_PA_input$u_F <- original_u_F_age
+df_PA_input$u_P <- original_u_P_age
 
-df_PA_input$u_F <- u_F_samples_ramsey
-df_PA_input$u_P <- u_P_samples_ramsey
-
-cat("  u_F (Ramsey PFS):", u_F_ramsey, "\n")
-cat("  u_P (Ramsey PD): ", u_P_ramsey, "\n")
 cat("  Running PSA loop (", n_runs, " iterations)...\n", sep = "")
 
 df_c_ramsey <- df_e_ramsey <- data.frame(SoC = rep(NA, n_runs), Exp = rep(NA, n_runs))
