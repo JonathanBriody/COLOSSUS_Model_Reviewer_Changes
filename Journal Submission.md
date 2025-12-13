@@ -340,7 +340,7 @@ _Methods:_ We developed an open-source health economic model to estimate cost-ef
 
 successor initiative) and the literature. Sensitivity analyses included individual and simultaneous variation of input parameters from a priori defined distributions.
 
-_Results:_ Bevacizumab was not cost-effective at conventional willingness-to-pay (WTP) thresholds in any of the three countries analysed. The highest incremental costeffectiveness ratio was in Germany at €241,188 per quality-adjusted life year (QALY), while the lowest was in Ireland at €180,477 per QALY. All deterministic and probabilistic sensitivity analyses demonstrated that these results were robust.
+_Results:_ Bevacizumab was not cost-effective at conventional willingness-to-pay (WTP) thresholds in any of the three countries analysed. Probabilistic analysis (10,000 Monte Carlo simulations) showed the highest incremental cost-effectiveness ratio (ICER) was in Germany at €241,188 per quality-adjusted life year (QALY), while the lowest was in Ireland at €180,477 per QALY. Mean incremental net monetary benefit was negative in all countries: Germany €-28,063 (95% CrI: €-38,685 to €-19,285), Ireland €-23,155 (95% CrI: €-30,496 to €-16,773), and Spain €-29,624 (95% CrI: €-37,663 to €-22,773). The probability of cost-effectiveness was 0% across all jurisdictions. All deterministic and probabilistic sensitivity analyses demonstrated that these results were robust.
 
 _Conclusions:_ Even for patients with mCRC manifesting improved outcomes, adding bevacizumab to first-line chemotherapy is invariably not cost-effective in any of the countries examined. Variability in pricing, healthcare costs and willingness to pay thresholds across countries did not commute this result.
 
@@ -577,23 +577,25 @@ _\*_**_Abbreviations:_** **_ESP:_** _Spanish,_ **_DE:_** _German,_ **_IRE:_** _I
 
 **5\. Results**
 
-The ICERs of bevacizumab, in addition to standard therapy, exceed conventional costeffectiveness thresholds in all three countries considered. While we estimate the same effects in each case, costs - and consequently ICERs - differ significantly. The highest ICER was in Germany at €241,188 per QALY, and the lowest was in Ireland at €180,477 per QALY. In Spain, the ICER was €201,346 per QALY. While the reported ICERs exceed thresholds by a considerable margin, they are in accordance with other cost-effectiveness analyses of bevacizumab in the U.S., U.K., Australia, Israel, and Canada \[35\]. Notwithstanding, results are even less cost-effective in these studies which assess patients without chromosomal instability. All values are summarised in Table
+Probabilistic analysis (10,000 Monte Carlo simulations) demonstrates that the ICERs of bevacizumab, in addition to standard therapy, exceed conventional cost-effectiveness thresholds in all three countries considered. While we estimate similar effects in each case (mean incremental QALYs: 0.171-0.173), costs - and consequently ICERs - differ significantly. The highest ICER was in Germany at €241,188 per QALY, and the lowest was in Ireland at €180,477 per QALY. In Spain, the ICER was €201,346 per QALY. Mean incremental net monetary benefit (NMB) was negative in all countries: Germany €-28,063 (95% CrI: €-38,685 to €-19,285), Ireland €-23,155 (95% CrI: €-30,496 to €-16,773), and Spain €-29,624 (95% CrI: €-37,663 to €-22,773). The probability of bevacizumab being cost-effective was 0% across all jurisdictions at their respective WTP thresholds. While the reported ICERs exceed thresholds by a considerable margin, they are in accordance with other cost-effectiveness analyses of bevacizumab in the U.S., U.K., Australia, Israel, and Canada \[35\]. Notwithstanding, results are even less cost-effective in these studies which assess patients without chromosomal instability. All values are summarised in Table
 
 -
 
-Table 2. Cost-Effectiveness Results for the Addition of Bevacizumab to
-
-First-line mCRC Chemotherapy in ANGIOPREDICT
+Table 2. Probabilistic Cost-Effectiveness Results for the Addition of Bevacizumab to First-line mCRC Chemotherapy in ANGIOPREDICT (10,000 Monte Carlo Simulations)
 
 | Result | Germany | Ireland | Spain |
 | --- | --- | --- | --- |
-| Total incremental cost (Euro) | 41,699 | 30,847 | 34,811 |
-| Total incremental effect<br><br>(QALYs) | 0.173 | 0.171 | 0.173 |
+| WTP threshold (Euro/QALY) | 78,871 | 45,000 | 30,000 |
+| Incremental cost (Euro), mean | 41,699 | 30,847 | 34,811 |
+| 95% CrI | (26,480 to 58,435) | (22,086 to 40,747) | (26,141 to 44,848) |
+| Incremental QALYs, mean | 0.173 | 0.171 | 0.173 |
+| 95% CrI | (0.067 to 0.292) | (0.066 to 0.289) | (0.067 to 0.292) |
 | ICER (Euro/QALY) | 241,188 | 180,477 | 201,346 |
+| Incremental NMB (Euro), mean | -28,063 | -23,155 | -29,624 |
+| 95% CrI | (-38,685 to -19,285) | (-30,496 to -16,773) | (-37,663 to -22,773) |
+| Probability cost-effective | 0% | 0% | 0% |
 
-_ICER = incremental cost-effectiveness ratio; QALY = quality-adjusted_
-
-_life year_
+_CrI = credible interval; ICER = incremental cost-effectiveness ratio; NMB = net monetary benefit; QALY = quality-adjusted life year; WTP = willingness-to-pay_
 
 Figure 2 presents the results of a one-way sensitivity analysis evaluating the individual impact of each model parameter on the overall uncertainty in cost-effectiveness outcomes. Across the univariate analyses, parameters that influenced ICERs were comparable between countries. The most significant influence on the ICER consistently came from the hazard ratio describing
 
