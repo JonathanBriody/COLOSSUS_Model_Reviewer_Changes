@@ -13411,11 +13411,12 @@ mean_nmb_rv <- mean(nmb_raise_velour)
 
 # Get Wen et al. base case results from original PSA (l_PA object)
 # These were calculated in the main PSA section
-mean_inc_cost_wen <- mean(l_PA$cost[, "Experimental"] - l_PA$cost[, "SoC"])
-mean_inc_qaly_wen <- mean(l_PA$effectiveness[, "Experimental"] - l_PA$effectiveness[, "SoC"])
+# Note: l_PA uses strategy names "SoC" and "Bev"
+mean_inc_cost_wen <- mean(l_PA$cost[, "Bev"] - l_PA$cost[, "SoC"])
+mean_inc_qaly_wen <- mean(l_PA$effectiveness[, "Bev"] - l_PA$effectiveness[, "SoC"])
 mean_icer_wen <- mean_inc_cost_wen / mean_inc_qaly_wen
-nmb_wen <- (l_PA$effectiveness[, "Experimental"] - l_PA$effectiveness[, "SoC"]) * n_wtp -
-           (l_PA$cost[, "Experimental"] - l_PA$cost[, "SoC"])
+nmb_wen <- (l_PA$effectiveness[, "Bev"] - l_PA$effectiveness[, "SoC"]) * n_wtp -
+           (l_PA$cost[, "Bev"] - l_PA$cost[, "SoC"])
 mean_nmb_wen <- mean(nmb_wen)
 
 # Calculate percentage changes
