@@ -1,0 +1,20 @@
+"Result","Germany","Ireland","Spain"
+"WTP threshold (EUR/QALY)",78871,45000,30000
+"Standard of Care (SoC)","","",""
+"SoC Total cost (EUR) mean",64714,19859,15660
+"SoC Total QALYs mean",0.613,0.609,0.613
+"Bevacizumab + SoC","","",""
+"Bev Total cost (EUR) mean",106413,50706,50470
+"Bev Total QALYs mean",0.785,0.780,0.785
+"Incremental (Bevacizumab vs SoC)","","",""
+"Incremental cost (EUR) mean",41699,30847,34811
+"Incremental cost 95% CrI lower",26480,22086,26141
+"Incremental cost 95% CrI upper",58435,40747,44848
+"Incremental QALYs mean",0.173,0.171,0.173
+"Incremental QALYs 95% CrI lower",0.067,0.066,0.067
+"Incremental QALYs 95% CrI upper",0.292,0.289,0.292
+"ICER (EUR/QALY)",241188,180477,201346
+"Incremental NMB (EUR) mean",-28063,-23155,-29624
+"Incremental NMB 95% CrI lower",-38685,-30496,-37663
+"Incremental NMB 95% CrI upper",-19285,-16773,-22773
+"Probability cost-effective",0,0,0
