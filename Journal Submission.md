@@ -585,17 +585,24 @@ Table 2. Probabilistic Cost-Effectiveness Results for the Addition of Bevacizuma
 
 | Result | Germany | Ireland | Spain |
 | --- | --- | --- | --- |
-| WTP threshold (Euro/QALY) | 78,871 | 45,000 | 30,000 |
-| Incremental cost (Euro), mean | 41,699 | 30,847 | 34,811 |
+| WTP threshold (€/QALY) | 78,871 | 45,000 | 30,000 |
+| **Standard of Care (SoC)** | | | |
+| Total cost (€), mean | 64,714 | 19,859 | 15,660 |
+| Total QALYs, mean | 0.613 | 0.609 | 0.613 |
+| **Bevacizumab + SoC** | | | |
+| Total cost (€), mean | 106,413 | 50,706 | 50,470 |
+| Total QALYs, mean | 0.785 | 0.780 | 0.785 |
+| **Incremental (Bevacizumab vs SoC)** | | | |
+| Incremental cost (€), mean | 41,699 | 30,847 | 34,811 |
 | 95% CrI | (26,480 to 58,435) | (22,086 to 40,747) | (26,141 to 44,848) |
 | Incremental QALYs, mean | 0.173 | 0.171 | 0.173 |
 | 95% CrI | (0.067 to 0.292) | (0.066 to 0.289) | (0.067 to 0.292) |
-| ICER (Euro/QALY) | 241,188 | 180,477 | 201,346 |
-| Incremental NMB (Euro), mean | -28,063 | -23,155 | -29,624 |
+| ICER (€/QALY) | 241,188 | 180,477 | 201,346 |
+| Incremental NMB (€), mean | -28,063 | -23,155 | -29,624 |
 | 95% CrI | (-38,685 to -19,285) | (-30,496 to -16,773) | (-37,663 to -22,773) |
 | Probability cost-effective | 0% | 0% | 0% |
 
-_CrI = credible interval; ICER = incremental cost-effectiveness ratio; NMB = net monetary benefit; QALY = quality-adjusted life year; WTP = willingness-to-pay_
+_CrI = credible interval; ICER = incremental cost-effectiveness ratio; NMB = net monetary benefit; QALY = quality-adjusted life year; SoC = standard of care; WTP = willingness-to-pay_
 
 Figure 2 presents the results of a one-way sensitivity analysis evaluating the individual impact of each model parameter on the overall uncertainty in cost-effectiveness outcomes. Across the univariate analyses, parameters that influenced ICERs were comparable between countries. The most significant influence on the ICER consistently came from the hazard ratio describing
 
